@@ -178,7 +178,7 @@ export default function AgentsPage() {
               </button>
 
               {/* Resultaat preview */}
-              {resultaten[agent.id] && s === 'success' && (
+              {!!resultaten[agent.id] && s === 'success' && (
                 <details className="text-xs">
                   <summary className="cursor-pointer text-slate-500 hover:text-slate-700">Resultaat bekijken</summary>
                   <pre className="mt-2 bg-white/70 rounded p-3 overflow-auto max-h-48 text-slate-700 border border-white">
