@@ -38,7 +38,7 @@ export default async function PdfsPage() {
           {pdfs.map((pdf: any) => {
             const orderCount = pdf.pdf_orders?.[0]?.count ?? 0
             return (
-              <div key={pdf.id} className="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-5">
+              <Link key={pdf.id} href={`/dashboard/pdfs/${pdf.id}`} className="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-5 hover:border-indigo-300 hover:shadow-sm transition block">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`w-2 h-2 rounded-full ${pdf.active ? 'bg-green-400' : 'bg-gray-300'}`}></span>
@@ -48,13 +48,7 @@ export default async function PdfsPage() {
                   <p className="text-gray-500 text-sm">{pdf.subtitle}</p>
                   <div className="flex items-center gap-4 mt-2">
                     <span className="text-xs text-gray-400">/{pdf.slug}</span>
-                    <a
-                      href={`/${pdf.slug}`}
-                      target="_blank"
-                      className="text-xs text-indigo-500 hover:underline"
-                    >
-                      Bekijk landingspagina →
-                    </a>
+                    <span className="text-xs text-indigo-500">Bekijk dashboard →</span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -62,7 +56,7 @@ export default async function PdfsPage() {
                   <p className="text-sm text-gray-500 mt-1">{orderCount} verkopen</p>
                   <p className="text-sm text-green-600 font-medium">€{(orderCount * pdf.price).toFixed(2)} omzet</p>
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>
