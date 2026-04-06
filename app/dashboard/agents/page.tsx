@@ -1,204 +1,185 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-
-type AgentStatus = 'idle' | 'running' | 'success' | 'error'
-type Niche = { id: string; naam: string; icon: string }
+import Link from 'next/link'
 
 type Agent = {
+  stap: number
   id: string
   naam: string
   beschrijving: string
-  icon: string
-  endpoint: string
-  methode: 'GET' | 'POST'
-  kleur: string
-  nicheSelector?: boolean
+  details: string[]
+  badge: string
+  badgeColor: string
 }
 
-const AGENTS: Agent[] = [
+const PIPELINE_AGENTS: Agent[] = [
   {
-    id: 'trend-scout',
-    naam: 'Trend Scout',
-    beschrijving: 'Scrapt Google Trends, LinkedIn posts en Reddit voor actuele hooks en thema\'s per niche.',
-    icon: '🔍',
-    endpoint: '/api/agents/trend-scout',
-    methode: 'GET',
-    kleur: 'blue',
+    stap: 1,
+    id: 'research-ideas',
+    naam: 'Research Ideas',
+    beschrijving: 'Zoekt actuele AI-tool ideeën voor kleine ondernemers op basis van live marktdata.',
+    details: ['Reddit trends', 'ProductHunt scraping', 'Google Trends (Apify)', 'LinkedIn posts'],
+    badge: 'Stap 1',
+    badgeColor: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   },
   {
-    id: 'outreach',
-    naam: 'Outreach Agent',
-    beschrijving: 'Vindt nieuwe vakbedrijven via Apify Google Maps, beoordeelt prospects en stuurt gepersonaliseerde emails.',
-    icon: '🎯',
-    endpoint: '/api/outreach',
-    methode: 'POST',
-    kleur: 'orange',
+    stap: 2,
+    id: 'marketing-plan',
+    naam: 'Marketing Plan',
+    beschrijving: 'Bouwt een volledig marketing blueprint: ICP, email sequentie en social strategie.',
+    details: ['Ideaal klantprofiel (ICP)', '3-delige email sequentie', 'LinkedIn + Meta + Instagram plan', 'Zoekwoord strategie'],
+    badge: 'Stap 2',
+    badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
   },
   {
-    id: 'marketing-research',
-    naam: 'Marketing Research',
-    beschrijving: 'Analyseert leads en outreach data per niche voor strategische aanbevelingen.',
-    icon: '📊',
-    endpoint: '/api/marketing/research',
-    methode: 'POST',
-    kleur: 'purple',
-    nicheSelector: true,
+    stap: 3,
+    id: 'landing-page-agent',
+    naam: 'Landing Page Agent',
+    beschrijving: 'Schrijft volledige SEO-copy en maakt automatisch een Stripe product + prijs aan.',
+    details: ['Hero headline + subline', '3 features + 5 voordelen', 'FAQ + sociaal bewijs', 'Stripe product aanmaken'],
+    badge: 'Stap 3',
+    badgeColor: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  },
+  {
+    stap: 4,
+    id: 'content-creator',
+    naam: 'Content Creator',
+    beschrijving: 'Genereert 3 kant-en-klare social posts (LinkedIn, Meta, Instagram) met stockfoto\'s.',
+    details: ['LinkedIn post (150-250 woorden)', 'Meta advertentie tekst', 'Instagram post + hashtags', 'Pexels stockfoto per platform'],
+    badge: 'Stap 4',
+    badgeColor: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
+  },
+  {
+    stap: 5,
+    id: 'lead-gen-pipeline',
+    naam: 'Lead Gen Pipeline',
+    beschrijving: 'Vindt 10–30 bedrijven via Google Maps die passen bij het ideaal klantprofiel.',
+    details: ['Google Maps scraping (Apify)', 'ICP-matching score 1-10', 'Deduplicatie', 'Kwaliteitsranking'],
+    badge: 'Stap 5',
+    badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  },
+  {
+    stap: 6,
+    id: 'outreach-writer',
+    naam: 'Outreach Writer',
+    beschrijving: 'Schrijft gepersonaliseerde cold emails per lead op basis van sector, naam en pijnpunt.',
+    details: ['Gepersonaliseerde aanhef', 'Pain hook (dag 1 structuur)', 'Bedrijfsspecifieke copy', 'Klaar voor verzending'],
+    badge: 'Stap 6',
+    badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
   },
 ]
 
-const KLEUR: Record<string, { bg: string; text: string; border: string; btn: string }> = {
-  blue:   { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   btn: 'bg-blue-600 hover:bg-blue-700' },
-  orange: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', btn: 'bg-orange-500 hover:bg-orange-600' },
-  purple: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', btn: 'bg-purple-600 hover:bg-purple-700' },
-}
-
 export default function AgentsPage() {
-  const [status, setStatus] = useState<Record<string, AgentStatus>>({})
-  const [resultaten, setResultaten] = useState<Record<string, unknown>>({})
-  const [logs, setLogs] = useState<Record<string, string>>({})
-  const [niches, setNiches] = useState<Niche[]>([])
-  const [selectedNiche, setSelectedNiche] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    fetch('/api/niches').then(r => r.json()).then(d => {
-      const list: Niche[] = d.niches || []
-      setNiches(list)
-      if (list.length) {
-        const defaults: Record<string, string> = {}
-        AGENTS.filter(a => a.nicheSelector).forEach(a => { defaults[a.id] = list[0].id })
-        setSelectedNiche(defaults)
-      }
-    })
-  }, [])
-
-  async function startAgent(agent: Agent) {
-    setStatus(s => ({ ...s, [agent.id]: 'running' }))
-    setLogs(l => ({ ...l, [agent.id]: 'Agent gestart...' }))
-    const start = Date.now()
-
-    try {
-      const res = await fetch('/api/agents/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agentId: agent.id,
-          ...(agent.nicheSelector ? { niche_id: selectedNiche[agent.id] } : {}),
-        }),
-      })
-      const data = await res.json()
-      const duur = ((Date.now() - start) / 1000).toFixed(1)
-
-      if (res.ok) {
-        setStatus(s => ({ ...s, [agent.id]: 'success' }))
-        setResultaten(r => ({ ...r, [agent.id]: data }))
-        setLogs(l => ({ ...l, [agent.id]: `Klaar in ${duur}s` }))
-      } else {
-        setStatus(s => ({ ...s, [agent.id]: 'error' }))
-        setLogs(l => ({ ...l, [agent.id]: `Fout: ${data.error || res.statusText}` }))
-      }
-    } catch (e) {
-      setStatus(s => ({ ...s, [agent.id]: 'error' }))
-      setLogs(l => ({ ...l, [agent.id]: `Netwerkfout: ${String(e)}` }))
-    }
-  }
-
-  function statusBadge(s: AgentStatus) {
-    if (s === 'running') return <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 animate-pulse">⚙️ Bezig...</span>
-    if (s === 'success') return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">✅ Klaar</span>
-    if (s === 'error')   return <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">❌ Fout</span>
-    return null
-  }
-
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Agents</h1>
-        <p className="text-gray-500 mt-1">Start agents handmatig. Alle agents draaien ook automatisch via cron.</p>
-      </div>
+    <div className="p-8 max-w-[1200px]">
 
-      {/* Cron schema info */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-8">
-        <h2 className="font-semibold text-slate-700 mb-3">Automatisch schema</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          <div className="flex items-center gap-2 text-slate-600"><span>🔍</span> Trend Scout — <span className="font-mono text-slate-800">07:00 ma-vr</span></div>
-          <div className="flex items-center gap-2 text-slate-600"><span>🎯</span> Outreach — <span className="font-mono text-slate-800">09:00 ma-vr</span></div>
-          <div className="flex items-center gap-2 text-slate-600"><span>📊</span> Research — <span className="font-mono text-slate-800">handmatig</span></div>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-10">
+        <div>
+          <p className="text-[13px] font-medium text-slate-400 mb-1 uppercase tracking-wider">Automatisering</p>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">AI Agents</h1>
+          <p className="text-slate-500 mt-1.5 text-[15px]">
+            6 gespecialiseerde agents die samen de volledige pipeline uitvoeren — van marktonderzoek naar outreach.
+          </p>
         </div>
+        <Link
+          href="/dashboard/pipeline"
+          className="flex items-center gap-2 bg-orange-500 hover:bg-orange-400 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-lg shadow-orange-500/25"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Start pipeline
+        </Link>
       </div>
 
-      {/* Agent kaarten */}
-      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-        {AGENTS.map(agent => {
-          const k = KLEUR[agent.kleur]
-          const s = status[agent.id] || 'idle'
-          return (
-            <div key={agent.id} className={`rounded-xl border ${k.border} ${k.bg} p-6 flex flex-col gap-4`}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xl">{agent.icon}</span>
-                    <span className="font-bold text-slate-900">{agent.naam}</span>
-                  </div>
-                  <p className="text-sm text-slate-600">{agent.beschrijving}</p>
-                </div>
-                {statusBadge(s)}
+      {/* Pipeline flow indicator */}
+      <div className="bg-slate-900 rounded-2xl p-5 mb-8">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+          {PIPELINE_AGENTS.map((agent, i) => (
+            <div key={agent.id} className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2">
+                <span className="text-[11px] font-bold text-orange-500">{String(agent.stap).padStart(2, '0')}</span>
+                <span className="text-[12px] font-medium text-slate-300">{agent.naam}</span>
               </div>
-
-              {/* Niche selector voor agents die dat nodig hebben */}
-              {agent.nicheSelector && niches.length > 0 && (
-                <select
-                  value={selectedNiche[agent.id] || ''}
-                  onChange={e => setSelectedNiche(n => ({ ...n, [agent.id]: e.target.value }))}
-                  disabled={s === 'running'}
-                  className="w-full border border-white bg-white/70 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-400 disabled:opacity-50"
-                >
-                  {niches.map(n => (
-                    <option key={n.id} value={n.id}>{n.icon} {n.naam}</option>
-                  ))}
-                </select>
-              )}
-
-              {logs[agent.id] && (
-                <div className="text-xs font-mono bg-white/70 rounded-lg px-3 py-2 text-slate-600 border border-white">
-                  {logs[agent.id]}
-                </div>
-              )}
-
-              <button
-                onClick={() => startAgent(agent)}
-                disabled={s === 'running' || (agent.nicheSelector && !selectedNiche[agent.id])}
-                className={`${k.btn} disabled:opacity-50 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2`}
-              >
-                {s === 'running' ? <><span className="animate-spin">⚙️</span> Bezig...</> : <><span>▶</span> Start {agent.naam}</>}
-              </button>
-
-              {/* Resultaat preview */}
-              {!!resultaten[agent.id] && s === 'success' && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-slate-500 hover:text-slate-700">Resultaat bekijken</summary>
-                  <pre className="mt-2 bg-white/70 rounded p-3 overflow-auto max-h-48 text-slate-700 border border-white">
-                    {JSON.stringify(resultaten[agent.id], null, 2)}
-                  </pre>
-                </details>
+              {i < PIPELINE_AGENTS.length - 1 && (
+                <svg className="w-4 h-4 text-slate-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               )}
             </div>
-          )
-        })}
+          ))}
+        </div>
+        <p className="text-slate-500 text-[12px] mt-3">
+          Elke agent wordt automatisch gestart na goedkeuring van de vorige stap. Ga naar{' '}
+          <Link href="/dashboard/pipeline" className="text-orange-400 hover:text-orange-300 underline underline-offset-2">Pipeline</Link>
+          {' '}om te starten.
+        </p>
       </div>
 
-      {/* Content generator shortcut */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <h2 className="font-bold text-slate-900 mb-1">Content genereren per niche</h2>
-        <p className="text-sm text-slate-500 mb-4">
-          De Content Generator gebruikt automatisch de laatste Trend Scout data als input.
-        </p>
-        <a
-          href="/dashboard/marketing"
-          className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition"
+      {/* Agent cards grid */}
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {PIPELINE_AGENTS.map((agent) => (
+          <div key={agent.id} className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden hover:border-slate-300 hover:shadow-md transition-all group">
+            {/* Top bar */}
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
+                  <span className="text-orange-400 font-black text-xs">{String(agent.stap).padStart(2, '0')}</span>
+                </div>
+                <h3 className="font-bold text-slate-900 text-[14px]">{agent.naam}</h3>
+              </div>
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${agent.badgeColor}`}>
+                {agent.badge}
+              </span>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4">
+              <p className="text-slate-500 text-[13px] leading-relaxed mb-4">{agent.beschrijving}</p>
+
+              {/* Details */}
+              <div className="space-y-1.5">
+                {agent.details.map((detail) => (
+                  <div key={detail} className="flex items-center gap-2 text-[12px] text-slate-400">
+                    <span className="w-1 h-1 bg-orange-400 rounded-full shrink-0" />
+                    {detail}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400 font-medium">Automatisch via pipeline</span>
+                <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                  <span className="w-1.5 h-1.5 bg-slate-300 rounded-full" />
+                  Wacht op stap {agent.stap > 1 ? agent.stap - 1 : '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA bottom */}
+      <div className="mt-8 bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 flex items-center justify-between">
+        <div>
+          <h3 className="font-bold text-white text-[16px] mb-1">Klaar om de pipeline te starten?</h3>
+          <p className="text-slate-400 text-[13px]">
+            De AI voert alle 6 stappen uit. Jij keurt elke stap goed voordat de volgende begint.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/pipeline"
+          className="shrink-0 flex items-center gap-2 bg-orange-500 hover:bg-orange-400 text-white font-semibold px-6 py-3 rounded-xl text-sm transition-colors shadow-lg shadow-orange-500/25 ml-6"
         >
-          <span>📱</span> Naar Marketing
-        </a>
+          Start nu
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </Link>
       </div>
     </div>
   )
