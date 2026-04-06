@@ -18,18 +18,16 @@ export default function GenerateIdeasButton({ secret }: { secret: string }) {
       const data = await res.json()
       if (res.ok && data.success) {
         setStatus('done')
-        setMessage(`${data.count} nieuwe ideeën gegenereerd!`)
-        setTimeout(() => {
-          router.refresh()
-          setStatus('idle')
-        }, 2000)
+        setMessage(`✓ ${data.count} nieuwe ideeën gegenereerd!`)
+        router.refresh()
+        setTimeout(() => setStatus('idle'), 4000)
       } else {
         setStatus('error')
-        setMessage(data.error || 'Er ging iets mis.')
+        setMessage(data.error || `HTTP ${res.status}: er ging iets mis.`)
       }
-    } catch {
+    } catch (err) {
       setStatus('error')
-      setMessage('Netwerkfout. Probeer opnieuw.')
+      setMessage(`Netwerkfout: ${err}`)
     }
   }
 

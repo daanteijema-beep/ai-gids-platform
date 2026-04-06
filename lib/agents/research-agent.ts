@@ -129,15 +129,31 @@ Antwoord in dit JSON formaat:
 
   if (!finalText) throw new Error('Research agent produced no output')
 
-  const raw = extractFinalJson(currentMessages, finalText)
-  const parsed = JSON.parse(raw)
+  let parsed: any
+  try {
+    const raw = extractFinalJson(currentMessages, finalText)
+    parsed = JSON.parse(raw)
+  } catch (e) {
+    // Try harder: find JSON array of ideas anywhere in the text
+    const arrayMatch = finalText.match(/"ideas"\s*:\s*(\[[\s\S]*?\])/)?.[1]
+    if (arrayMatch) {
+      parsed = { ideas: JSON.parse(arrayMatch) }
+    } else {
+      console.error('Research JSON parse failed. Raw output:', finalText.substring(0, 500))
+      throw new Error(`JSON parse failed: ${e}. Output preview: ${finalText.substring(0, 200)}`)
+    }
+  }
+
+  if (!parsed.ideas || !Array.isArray(parsed.ideas) || parsed.ideas.length === 0) {
+    throw new Error('Research agent returned no ideas array. Output: ' + finalText.substring(0, 200))
+  }
 
   if (parsed.research_summary) {
     await supabaseAdmin.from('agent_learnings').insert({
       learning_type: 'general',
       insight: `[Research run] ${parsed.research_summary}`,
       data_points: { source: 'web_research', timestamp: new Date().toISOString() },
-    })
+    }).catch(() => {}) // non-fatal
   }
 
   const insertedIds: string[] = []
@@ -147,22 +163,25 @@ Antwoord in dit JSON formaat:
       .from('pdf_ideas')
       .insert({
         status: 'pending',
-        niche: idea.niche,
+        niche: idea.niche || 'Algemeen',
         title: idea.title,
-        subtitle: idea.subtitle,
-        target_audience: idea.target_audience,
-        problem_solved: idea.problem_solved,
-        estimated_price: idea.estimated_price,
-        research_rationale: idea.research_rationale,
-        agent_confidence_score: idea.agent_confidence_score,
-        form_fields: idea.form_fields,
+        subtitle: idea.subtitle || '',
+        target_audience: idea.target_audience || '',
+        problem_solved: idea.problem_solved || '',
+        estimated_price: idea.estimated_price || 12,
+        research_rationale: idea.research_rationale || '',
+        agent_confidence_score: idea.agent_confidence_score || 70,
+        form_fields: idea.form_fields || [],
       })
       .select('id')
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('Insert idea error:', error.message, 'Idea:', idea.title)
+      throw new Error(`DB insert failed for "${idea.title}": ${error.message}`)
+    }
     insertedIds.push(data.id)
   }
 
-  return { count: insertedIds.length, ids: insertedIds, researchSummary: parsed.research_summary }
+  return { count: insertedIds.length, ids: insertedIds, researchSummary: parsed.research_summary || '' }
 }
