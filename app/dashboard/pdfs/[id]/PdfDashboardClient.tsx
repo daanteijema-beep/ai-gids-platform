@@ -297,7 +297,7 @@ export default function PdfDashboardClient({ data }: { data: any }) {
       {activeTab === 'images' && (
         <div className="bg-white border border-gray-200 rounded-2xl p-6">
           <h2 className="font-bold text-lg mb-1">🖼️ Gegenereerde Afbeeldingen</h2>
-          <p className="text-sm text-gray-500 mb-5">Automatisch aangemaakt via Pollinations.ai (gratis) bij goedkeuren</p>
+          <p className="text-sm text-gray-500 mb-5">Professionele stockfoto's via Picsum (gratis, geen API key)</p>
 
           {!images.hero_banner && !images.instagram?.length && !images.pdf_cover ? (
             <div className="text-center py-12 text-gray-400">

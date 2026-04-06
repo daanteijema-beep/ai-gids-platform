@@ -1,21 +1,26 @@
 /**
  * Image Subagent
- * Gebruikt Unsplash source URLs (gratis, commercieel gebruik, geen API key):
+ * Gebruikt picsum.photos (gratis, altijd beschikbaar, mooie foto's, geen API key):
  *   - 1 hero banner  (1200×630) voor de landingspagina
  *   - 1 PDF cover    (800×1100)
  *   - 3 Instagram posts (1080×1080)
  *
- * source.unsplash.com geeft telkens een andere foto terug op basis van trefwoorden.
- * We voegen een cachebuster toe zodat elke post een unieke foto krijgt.
+ * picsum.photos/seed/{seed}/{w}/{h} geeft altijd dezelfde foto voor hetzelfde seed.
+ * We baseren de seed op de niche zodat vergelijkbare producten vergelijkbare stijl krijgen.
  */
 import { supabaseAdmin } from '../../supabase'
-import { BRAND } from '../../brand'
 
-function unsplash(width: number, height: number, keywords: string, bust?: number): string {
-  const kw = encodeURIComponent(keywords)
-  const b = bust !== undefined ? bust : Math.floor(Math.random() * 9999)
-  // Unsplash source doesn't support cachebuster in path, but different keyword combos give different photos
-  return `https://source.unsplash.com/${width}x${height}/?${kw}&sig=${b}`
+// Deterministic seed from string
+function toSeed(str: string, offset = 0): number {
+  let hash = offset * 1000
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) & 0xffff
+  }
+  return Math.abs(hash) || (offset + 1) * 137
+}
+
+function picsum(width: number, height: number, seed: number): string {
+  return `https://picsum.photos/seed/${seed}/${width}/${height}`
 }
 
 export async function runImageSubagent(pdfId: string): Promise<{ imagesGenerated: number }> {
@@ -27,16 +32,15 @@ export async function runImageSubagent(pdfId: string): Promise<{ imagesGenerated
 
   if (!pdf) throw new Error('PDF not found')
 
-  const niche = (pdf.pdf_ideas as any)?.niche || 'ondernemen'
-  const n = niche.toLowerCase()
+  const niche = ((pdf.pdf_ideas as any)?.niche || 'ondernemer').toLowerCase()
 
   const images = {
-    hero_banner: unsplash(1200, 630, `${n},entrepreneur,laptop,professional,office`, 1),
-    pdf_cover:   unsplash(800, 1100, `${n},professional,minimal,desk,clean`, 2),
+    hero_banner: picsum(1200, 630,  toSeed(niche, 0)),
+    pdf_cover:   picsum(800,  1100, toSeed(niche, 1)),
     instagram: [
-      unsplash(1080, 1080, `${n},business,workspace,success`, 3),
-      unsplash(1080, 1080, `${n},entrepreneur,focus,laptop`, 4),
-      unsplash(1080, 1080, `${n},lifestyle,work,modern,bright`, 5),
+      picsum(1080, 1080, toSeed(niche, 2)),
+      picsum(1080, 1080, toSeed(niche, 3)),
+      picsum(1080, 1080, toSeed(niche, 4)),
     ],
   }
 
