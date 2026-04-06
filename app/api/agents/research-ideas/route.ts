@@ -323,7 +323,14 @@ export async function POST(req: NextRequest) {
       type: idee.type,
       prijsindicatie: idee.prijsindicatie,
       validatiescore: idee.validatiescore,
-      bronnen: { gebruikt: bronnenGebruikt, markt_bewijs: idee.markt_bewijs, onderscheidend: idee.onderscheidend, zoektermen },
+      bronnen: {
+        gebruikt: bronnenGebruikt,
+        markt_bewijs: idee.markt_bewijs,
+        onderscheidend: idee.onderscheidend,
+        zoektermen,
+        // Sla de ruwe brondata op per bron zodat het in het dashboard zichtbaar is
+        brondata: allData.slice(0, 20).map(d => ({ bron: d.bron, titel: d.titel, tekst: d.tekst.slice(0, 300) })),
+      },
     }))
 
     const { error } = await supabaseAdmin.from('product_ideas').insert(inserts)

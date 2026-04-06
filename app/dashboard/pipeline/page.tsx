@@ -415,6 +415,38 @@ export default function PipelinePage() {
 
 // ─── Stap componenten ──────────────────────────────────────────────────────────
 
+type BronItem = { bron: string; titel: string; tekst: string }
+
+function BronDataInkijker({ bronnen }: { bronnen: Record<string, unknown> }) {
+  const [open, setOpen] = useState(false)
+  const brondata = (bronnen?.brondata as BronItem[]) || []
+  if (!brondata.length) return null
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2"
+      >
+        {open ? '▲ Verberg brondata' : `▼ Bekijk brondata (${brondata.length} items)`}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+          {brondata.map((item, i) => (
+            <div key={i} className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+              <div className="flex items-center gap-1.5 mb-1">
+                <BronLabel bron={item.bron} />
+                <span className="text-xs font-medium text-slate-700 truncate">{item.titel}</span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">{item.tekst}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BronLabel({ bron }: { bron: string }) {
   const config: Record<string, { label: string; kleur: string }> = {
     'google_trends': { label: 'Google Trends', kleur: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -512,6 +544,7 @@ function StapIdeeen({ ideeen, onKies, onAfwijzen, bezig }: {
                     <p className="text-xs text-green-700"><span className="font-semibold">vs ChatGPT:</span> {onderscheidend}</p>
                   </div>
                 )}
+                <BronDataInkijker bronnen={idee.bronnen} />
                 <button
                   onClick={() => onKies(idee.id)}
                   disabled={bezig}
