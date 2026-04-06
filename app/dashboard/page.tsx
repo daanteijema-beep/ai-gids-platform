@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
+import AgentButtons from './AgentButtons'
 
 export const revalidate = 30
 
@@ -51,42 +52,15 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Agent controls */}
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-bold text-lg mb-1">Research Agent</h2>
-          <p className="text-gray-500 text-sm mb-4">
-            Laat Claude nieuwe PDF ideeën onderzoeken en voorstellen op basis van markttrends en eerdere learnings.
-          </p>
-          <a
-            href={`/api/agents/research?secret=${process.env.CRON_SECRET}`}
-            className="inline-block bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-700 transition"
-            target="_blank"
-          >
-            Start research run →
-          </a>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-bold text-lg mb-1">Monitoring Agent</h2>
-          <p className="text-gray-500 text-sm mb-4">
-            Analyseer sales en bereik van alle actieve PDFs en extraheer learnings voor de research agent.
-          </p>
-          <a
-            href={`/api/agents/monitor?secret=${process.env.CRON_SECRET}`}
-            className="inline-block bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-700 transition"
-            target="_blank"
-          >
-            Start monitoring run →
-          </a>
-        </div>
-      </div>
+      {/* Agent buttons — client component with loading states */}
+      <AgentButtons />
 
       {/* Recent learnings */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="font-bold text-lg mb-4">Recente Learnings van de Agents</h2>
         {!recentLearnings?.length ? (
           <p className="text-gray-400 text-sm">
-            Nog geen learnings — start de monitoring agent om te beginnen.
+            Nog geen learnings — start de orchestrator agent om te beginnen.
           </p>
         ) : (
           <div className="space-y-3">

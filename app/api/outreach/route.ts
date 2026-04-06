@@ -1,3 +1,5 @@
+export const maxDuration = 300
+
 import { NextRequest, NextResponse } from 'next/server'
 import { runLeadFollowup, runCrossSell } from '@/lib/agents/outreach-agent'
 
