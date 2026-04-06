@@ -20,7 +20,18 @@ export async function GET(req: NextRequest) {
       }),
     })
 
-    const data = await res.json()
+    const text = await res.text()
+    let data: any
+    try { data = JSON.parse(text) } catch {
+      return new NextResponse(`
+        <html><body style="font-family:sans-serif;padding:40px;max-width:600px">
+          <h2>❌ Shopify gaf geen JSON terug</h2>
+          <p>Status: ${res.status}</p>
+          <pre style="background:#fee2e2;padding:12px;border-radius:8px;font-size:12px;overflow:auto">${text.substring(0, 500)}</pre>
+          <p>Waarschijnlijk verkeerde client_secret. <a href="/api/auth/shopify">Probeer opnieuw</a></p>
+        </body></html>
+      `, { headers: { 'Content-Type': 'text/html' } })
+    }
 
     if (!data.access_token) {
       return new NextResponse(`
