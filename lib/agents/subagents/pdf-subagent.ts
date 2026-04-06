@@ -13,7 +13,7 @@ import { generatePdfContent } from './pdf-content-generator'
 export async function runPdfSubagent(pdfId: string): Promise<{ chapters: number; chapterTitles: string[] }> {
   const { data: pdf } = await supabaseAdmin
     .from('pdfs')
-    .select('*, pdf_ideas(niche, target_audience, problem_solved, draft_pdf_html)')
+    .select('*, pdf_ideas(niche, target_audience, problem_solved, product_type, draft_pdf_html)')
     .eq('id', pdfId)
     .single()
 
@@ -23,6 +23,7 @@ export async function runPdfSubagent(pdfId: string): Promise<{ chapters: number;
   const niche = ideaData?.niche || 'ondernemer'
   const doelgroep = ideaData?.target_audience || 'Nederlandse ZZP\'er'
   const probleem = ideaData?.problem_solved || ''
+  const productType = ideaData?.product_type || 'swipe_file'
 
   let html: string
   let chapterTitles: string[]
@@ -45,6 +46,7 @@ export async function runPdfSubagent(pdfId: string): Promise<{ chapters: number;
       niche,
       doelgroep,
       probleem,
+      product_type: productType,
     })
     html = result.html
     chapterTitles = result.chapterTitles
