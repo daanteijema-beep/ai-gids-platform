@@ -1,24 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/agents/research?secret=a9f2c4e8b1d6f3a7e0c5b2d9f4a1e8c3b6d0f7a2e5c8b3d1f6a9e4c7b0d5f2a8",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/agents/social-trends?secret=a9f2c4e8b1d6f3a7e0c5b2d9f4a1e8c3b6d0f7a2e5c8b3d1f6a9e4c7b0d5f2a8",
-      "schedule": "0 7 * * 3"
-    },
-    {
-      "path": "/api/agents/orchestrate?secret=a9f2c4e8b1d6f3a7e0c5b2d9f4a1e8c3b6d0f7a2e5c8b3d1f6a9e4c7b0d5f2a8",
-      "schedule": "0 9 * * 1"
-    },
-    {
       "path": "/api/outreach?secret=a9f2c4e8b1d6f3a7e0c5b2d9f4a1e8c3b6d0f7a2e5c8b3d1f6a9e4c7b0d5f2a8",
-      "schedule": "0 10 * * 2"
-    },
-    {
-      "path": "/api/agents/lead-finder?secret=a9f2c4e8b1d6f3a7e0c5b2d9f4a1e8c3b6d0f7a2e5c8b3d1f6a9e4c7b0d5f2a8",
-      "schedule": "0 9 * * 2,4"
+      "schedule": "0 9 * * 1-5"
     }
   ]
 }

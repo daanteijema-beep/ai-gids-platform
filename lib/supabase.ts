@@ -4,25 +4,81 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// Client-side (anon key)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-// Server-side (service role — bypasses RLS)
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
-export type PdfIdea = {
+// ============================================================
+// VAKWEBTWENTE TYPES
+// ============================================================
+
+export type Niche = {
   id: string
   created_at: string
-  status: 'pending' | 'approved' | 'rejected' | 'published'
-  niche: string
-  title: string
-  subtitle: string
-  target_audience: string
-  problem_solved: string
-  estimated_price: number
-  research_rationale: string
-  agent_confidence_score: number
-  form_fields: FormField[]
+  naam: string
+  slug: string
+  sector_zoekterm: string
+  beschrijving: string | null
+  prijs_basis: number
+  prijs_pro: number
+  actief: boolean
+  icon: string
+  kleur: string
+}
+
+export type Lead = {
+  id: string
+  created_at: string
+  naam: string
+  bedrijf: string | null
+  telefoon: string
+  email: string | null
+  sector: string | null
+  bericht: string | null
+  niche_id: string | null
+  bron: 'contactformulier' | 'aanvraagflow' | 'demo'
+  status: 'nieuw' | 'gebeld' | 'demo' | 'klant' | 'afgewezen'
+  niches?: Niche
+}
+
+export type OutreachTarget = {
+  id: string
+  created_at: string
+  bedrijfsnaam: string
+  niche_id: string | null
+  sector: string | null
+  plaats: string | null
+  website: string | null
+  email: string | null
+  telefoon: string | null
+  website_score: number | null
+  agent_notitie: string | null
+  outreach_mail: string | null
+  status: 'gevonden' | 'mail_verstuurd' | 'gereageerd' | 'demo_gepland' | 'klant' | 'afgewezen'
+  mail_verstuurd_op: string | null
+  follow_up_op: string | null
+  niches?: Niche
+}
+
+export type MarketingContent = {
+  id: string
+  created_at: string
+  niche_id: string
+  type: 'cold_email_sequence' | 'linkedin_posts' | 'instagram_posts' | 'landing_page_copy' | 'whatsapp_script'
+  titel: string | null
+  content: unknown
+  status: 'draft' | 'actief' | 'gearchiveerd'
+  niches?: Niche
+}
+
+// ============================================================
+// LEGACY TYPES (backward compat met oude agent-bestanden)
+// ============================================================
+export type AgentLearning = {
+  id: string
+  created_at: string
+  learning_type: string
+  insight: string
+  data_points: Record<string, unknown>
 }
 
 export type FormField = {
@@ -34,63 +90,8 @@ export type FormField = {
   required: boolean
 }
 
-export type Pdf = {
-  id: string
-  idea_id: string
-  created_at: string
-  title: string
-  subtitle: string
-  description: string
-  price: number
-  stripe_product_id: string
-  stripe_price_id: string
-  slug: string
-  form_fields: FormField[]
-  active: boolean
-}
-
-export type LandingPage = {
-  id: string
-  pdf_id: string
-  hero_headline: string
-  hero_subtext: string
-  pain_points: string[]
-  benefits: string[]
-  social_proof: string[]
-  faq: { question: string; answer: string }[]
-  generated_at: string
-}
-
-export type SocialPost = {
-  id: string
-  pdf_id: string
-  created_at: string
-  platform: 'instagram' | 'linkedin' | 'tiktok'
-  post_type: 'awareness' | 'interest' | 'conversion'
-  content_text: string
-  hashtags: string[]
-  visual_description: string
-  scheduled_date: string
-  status: 'planned' | 'published'
-}
-
-export type PdfOrder = {
-  id: string
-  pdf_id: string
-  created_at: string
-  stripe_session_id: string
-  customer_email: string
-  customer_name: string
-  customer_inputs: Record<string, string>
-  generated_pdf_content: string | null
-  email_sent: boolean
-  status: 'pending_payment' | 'paid' | 'generated' | 'delivered'
-}
-
-export type AgentLearning = {
-  id: string
-  created_at: string
-  learning_type: 'niche_performance' | 'price_sensitivity' | 'platform_roi' | 'general'
-  insight: string
-  data_points: Record<string, unknown>
-}
+export type PdfIdea = { id: string; [key: string]: unknown }
+export type Pdf = { id: string; [key: string]: unknown }
+export type LandingPage = { id: string; [key: string]: unknown }
+export type SocialPost = { id: string; [key: string]: unknown }
+export type PdfOrder = { id: string; [key: string]: unknown }
