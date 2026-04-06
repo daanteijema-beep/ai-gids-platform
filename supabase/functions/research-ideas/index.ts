@@ -269,6 +269,27 @@ Deno.serve(async (req: Request) => {
     const analyse = await analyseerMarktdata(allData, contextBlok, zoektermen)
     console.log('Fase 2 klaar, analyse:', JSON.stringify(analyse)?.slice(0, 200))
 
+    // FASE 2b: Sla interessante inzichten op in market_knowledge (fire-and-forget)
+    if (analyse?.top_pijnpunten?.length) {
+      const kennisItems = [
+        ...((analyse.top_pijnpunten as Array<{pijnpunt:string;bewijs:string;bron:string;urgentie:number}>).map(p => ({
+          run_id, bron: p.bron || 'analyse', categorie: 'pijnpunt',
+          titel: p.pijnpunt.slice(0, 200), inhoud: p.bewijs || p.pijnpunt,
+          zoekterm: zoektermen[0], relevantie_score: p.urgentie || 7,
+          tags: [analyse.trending_sectoren?.[0] || ''].filter(Boolean),
+        }))),
+        ...allData.filter(d => d.score > 50).slice(0, 10).map(d => ({
+          run_id, bron: d.bron, categorie: d.bron === 'producthunt' ? 'tool' : 'citaat',
+          titel: d.titel.slice(0, 200), inhoud: d.tekst.slice(0, 1000),
+          zoekterm: zoektermen[0], relevantie_score: Math.min(10, Math.floor(d.score / 100) + 5),
+          tags: zoektermen.slice(0, 3),
+        })),
+      ]
+      supabase.from('market_knowledge').insert(kennisItems).then(() => {
+        console.log(`Market knowledge: ${kennisItems.length} items opgeslagen`)
+      }).catch(() => { /* non-critical */ })
+    }
+
     // FASE 3: Genereer ideeën op basis van de analyse
     console.log('Fase 3: ideeën genereren...')
     const ideeen = await genereerIdeeen(allData, analyse, contextBlok, zoektermen)

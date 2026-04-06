@@ -10,26 +10,54 @@ const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPAB
 
 function strip(t: string) { return t.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/```\s*$/i,'').trim() }
 
-async function zoekFoto(zoekterm: string): Promise<{ url: string; alt: string }> {
+async function zoekFoto(zoekterm: string, platform: string): Promise<{ url: string; alt: string; asset_id?: string }> {
+  // 1. Eerst brand_assets checken — pre-fetched foto's, geen API call nodig
+  const { data: brandFotos } = await supabase
+    .from('brand_assets')
+    .select('id, url, alt, gebruik_count')
+    .or(`zoekterm.ilike.%${zoekterm.split(' ')[0]}%,platform.eq.${platform}`)
+    .eq('type', 'photo')
+    .order('gebruik_count', { ascending: true }) // minst gebruikt eerst
+    .limit(3)
+
+  if (brandFotos?.length) {
+    const foto = brandFotos[0]
+    // Gebruik_count ophogen (fire-and-forget)
+    supabase.from('brand_assets').update({ gebruik_count: (foto.gebruik_count || 0) + 1 }).eq('id', foto.id).then(() => {})
+    return { url: foto.url, alt: foto.alt || zoekterm, asset_id: foto.id }
+  }
+
+  // 2. Fallback: live Pexels API
   const key = Deno.env.get('PEXELS_API_KEY')
   if (key) {
     try {
+      const orientation = platform === 'instagram' ? 'square' : 'landscape'
       const res = await fetch(
-        `https://api.pexels.com/v1/search?query=${encodeURIComponent(zoekterm)}&per_page=5&orientation=landscape`,
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(zoekterm)}&per_page=5&orientation=${orientation}`,
         { headers: { Authorization: key } }
       )
       if (res.ok) {
         const data = await res.json()
         const foto = data.photos?.[0]
-        if (foto) return { url: foto.src.large2x || foto.src.large, alt: foto.alt || zoekterm }
+        if (foto) {
+          // Sla op in brand_assets voor toekomstig gebruik
+          supabase.from('brand_assets').insert({
+            type: 'photo', zoekterm, pexels_id: String(foto.id),
+            url: foto.src.large2x || foto.src.large, thumbnail_url: foto.src.medium,
+            alt: foto.alt || zoekterm, breedte: foto.width, hoogte: foto.height,
+            platform, tags: zoekterm.split(' '),
+          }).then(() => {})
+          return { url: foto.src.large2x || foto.src.large, alt: foto.alt || zoekterm }
+        }
       }
     } catch { /* fall through */ }
   }
+
+  // 3. Laatste fallback
   const fallbacks: Record<string, string> = {
     default: 'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1200&q=80',
     business: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80',
     tech: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80',
-    people: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&q=80',
   }
   const key2 = Object.keys(fallbacks).find(k => zoekterm.toLowerCase().includes(k)) || 'default'
   return { url: fallbacks[key2], alt: zoekterm }
@@ -150,11 +178,11 @@ Alleen JSON.`
     try { posts = JSON.parse(strip((msg.content[0] as {text:string}).text)) }
     catch { await markeerFout('Claude gaf geen geldige JSON terug'); return new Response(JSON.stringify({ error: 'Ongeldige JSON' }), { status: 500 }) }
 
-    // Foto's parallel
+    // Foto's parallel — eerst brand_assets, dan Pexels live
     const [linkedinFoto, metaFoto, instagramFoto] = await Promise.all([
-      zoekFoto(posts.linkedin.foto_zoekterm as string),
-      zoekFoto(posts.meta.foto_zoekterm as string),
-      zoekFoto(posts.instagram.foto_zoekterm as string),
+      zoekFoto(posts.linkedin.foto_zoekterm as string, 'linkedin'),
+      zoekFoto(posts.meta.foto_zoekterm as string, 'meta'),
+      zoekFoto(posts.instagram.foto_zoekterm as string, 'instagram'),
     ])
 
     const linkedinBeeld = maakSociaalBeeld(linkedinFoto.url, posts.linkedin.headline as string, 'linkedin')
