@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { supabaseAdmin, PdfIdea, FormField } from '../supabase'
+import { supabaseAdmin } from '../supabase'
 import { createStripeProduct } from '../stripe'
+import { runTemplateAgent } from './template-agent'
+import { announceNewPdf } from './outreach-agent'
 
 const client = new Anthropic()
 
@@ -142,11 +144,17 @@ Antwoord ALLEEN in dit JSON formaat:
     })
   }
 
-  // 6. Mark idea as published
+  // 6. Generate PDF template for this niche
+  await runTemplateAgent(pdf.id)
+
+  // 7. Mark idea as published
   await supabaseAdmin
     .from('pdf_ideas')
     .update({ status: 'published' })
     .eq('id', ideaId)
+
+  // 8. Announce to existing leads (async, non-blocking)
+  announceNewPdf(pdf.id).catch(err => console.error('Announce error:', err))
 
   return { pdfId: pdf.id, slug }
 }
