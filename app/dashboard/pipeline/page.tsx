@@ -87,13 +87,23 @@ export default function PipelinePage() {
     return () => clearInterval(t)
   }, [runs, laadRuns])
 
+  async function triggerAgent(agentId: string, runId: string) {
+    await fetch('/api/agents/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId, run_id: runId }),
+    })
+  }
+
   async function startRun() {
     setBezig(true)
     const res = await fetch('/api/pipeline/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
     if (res.ok) {
-      const { run_id } = await res.json()
+      const { run_id, next_agent } = await res.json()
       setActieveRun(run_id)
       await laadRuns()
+      // Trigger de eerste agent (research-ideas) direct vanuit de browser
+      if (next_agent) triggerAgent(next_agent, run_id)
     }
     setBezig(false)
   }
@@ -130,7 +140,7 @@ export default function PipelinePage() {
 
   async function keurGoed(runId: string, extra: Record<string, unknown> = {}) {
     setBezig(true)
-    await fetch(`/api/pipeline/${runId}/approve`, {
+    const res = await fetch(`/api/pipeline/${runId}/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(extra),
@@ -140,6 +150,11 @@ export default function PipelinePage() {
     setStap2Data(d => { const n = { ...d }; delete n[runId]; return n })
     await laadRuns()
     setBezig(false)
+    // Trigger volgende agent direct vanuit de browser
+    if (res.ok) {
+      const { next_agent } = await res.json().catch(() => ({}))
+      if (next_agent) triggerAgent(next_agent, runId)
+    }
   }
 
   async function keurAf(runId: string) {
