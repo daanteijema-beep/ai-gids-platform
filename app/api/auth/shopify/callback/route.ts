@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
-  const shop = searchParams.get('shop') || process.env.SHOPIFY_STORE_URL!
+  const shop = searchParams.get('shop')
+  const state = searchParams.get('state')
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL!
 
-  if (!code) {
-    return NextResponse.json({ error: 'No code received' }, { status: 400 })
+  // Validate state cookie
+  const cookieState = req.cookies.get('shopify_oauth_state')?.value
+  if (!cookieState || cookieState !== state) {
+    return NextResponse.redirect(`${appUrl}/dashboard/settings?error=shopify_invalid_state`)
+  }
+
+  if (!code || !shop) {
+    return NextResponse.redirect(`${appUrl}/dashboard/settings?error=shopify_missing_params`)
   }
 
   try {
@@ -20,49 +29,29 @@ export async function GET(req: NextRequest) {
       }),
     })
 
-    const text = await res.text()
-    let data: any
-    try { data = JSON.parse(text) } catch {
-      return new NextResponse(`
-        <html><body style="font-family:sans-serif;padding:40px;max-width:600px">
-          <h2>❌ Shopify gaf geen JSON terug</h2>
-          <p>Status: ${res.status}</p>
-          <pre style="background:#fee2e2;padding:12px;border-radius:8px;font-size:12px;overflow:auto">${text.substring(0, 500)}</pre>
-          <p>Waarschijnlijk verkeerde client_secret. <a href="/api/auth/shopify">Probeer opnieuw</a></p>
-        </body></html>
-      `, { headers: { 'Content-Type': 'text/html' } })
-    }
+    const data = await res.json() as { access_token?: string; error?: string }
 
     if (!data.access_token) {
-      return new NextResponse(`
-        <html><body style="font-family:sans-serif;padding:40px;max-width:600px">
-          <h2>❌ Token exchange mislukt</h2>
-          <pre style="background:#fee2e2;padding:12px;border-radius:8px">${JSON.stringify(data, null, 2)}</pre>
-          <p>Probeer opnieuw: <a href="/api/auth/shopify">Koppel Shopify</a></p>
-        </body></html>
-      `, { headers: { 'Content-Type': 'text/html' } })
+      return NextResponse.redirect(`${appUrl}/dashboard/settings?error=shopify_token_failed`)
     }
 
-    // Save token to Vercel env automatically
-    return new NextResponse(`
-      <html><body style="font-family:sans-serif;padding:40px;max-width:600px">
-        <h2>✅ Shopify gekoppeld!</h2>
-        <p>Jouw access token:</p>
-        <code style="background:#f3f4f6;padding:12px;display:block;border-radius:8px;word-break:break-all;font-size:13px">
-          SHOPIFY_ACCESS_TOKEN=${data.access_token}
-        </code>
-        <p style="margin-top:16px">Zet dit in je <strong>.env.local</strong> en als Vercel environment variable.</p>
-        <p style="color:#6b7280;font-size:13px">Shop: ${shop}</p>
-      </body></html>
-    `, { headers: { 'Content-Type': 'text/html' } })
+    // Save to Supabase
+    await supabaseAdmin.from('agent_learnings').upsert({
+      learning_type: 'general',
+      insight: '__SHOPIFY_CONFIG__',
+      data_points: {
+        access_token: data.access_token,
+        shop_domain: shop,
+        connected_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      },
+    })
 
-  } catch (err) {
-    return new NextResponse(`
-      <html><body style="font-family:sans-serif;padding:40px">
-        <h2>❌ Fout</h2>
-        <pre>${String(err)}</pre>
-        <a href="/api/auth/shopify">Probeer opnieuw</a>
-      </body></html>
-    `, { headers: { 'Content-Type': 'text/html' } })
+    const response = NextResponse.redirect(`${appUrl}/dashboard/settings?shopify_connected=1`)
+    response.cookies.delete('shopify_oauth_state')
+    return response
+
+  } catch {
+    return NextResponse.redirect(`${appUrl}/dashboard/settings?error=shopify_error`)
   }
 }
