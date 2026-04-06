@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react'
 
-const SECRET = process.env.NEXT_PUBLIC_CRON_SECRET || ''
-
 type AgentStatus = 'idle' | 'running' | 'success' | 'error'
 type Niche = { id: string; naam: string; icon: string }
 
@@ -80,15 +78,13 @@ export default function AgentsPage() {
     const start = Date.now()
 
     try {
-      const url = `${agent.endpoint}?secret=${encodeURIComponent(SECRET)}`
-      const body = agent.methode === 'POST'
-        ? JSON.stringify(agent.nicheSelector ? { niche_id: selectedNiche[agent.id] } : {})
-        : undefined
-
-      const res = await fetch(url, {
-        method: agent.methode,
-        headers: agent.methode === 'POST' ? { 'Content-Type': 'application/json' } : {},
-        body,
+      const res = await fetch('/api/agents/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: agent.id,
+          ...(agent.nicheSelector ? { niche_id: selectedNiche[agent.id] } : {}),
+        }),
       })
       const data = await res.json()
       const duur = ((Date.now() - start) / 1000).toFixed(1)
