@@ -284,13 +284,18 @@ export async function POST(req: NextRequest) {
     // Log event
     await supabaseAdmin.from('pipeline_analytics').insert({ run_id, event_type: 'run_gestart', stap: 1 })
 
-    // Leer van eerdere campagnes + eerder gegenereerde ideeën parallel ophalen
-    const [learnings, eerdereIdeeen] = await Promise.all([
+    // Lees gebruikersprompt + leer van eerdere campagnes parallel
+    const [runData, learnings, eerdereIdeeen] = await Promise.all([
+      supabaseAdmin.from('pipeline_runs').select('notitie').eq('id', run_id).single(),
       haalLearnings(),
       haalEerdereIdeeen(),
     ])
 
-    const contextBlok = [learnings, eerdereIdeeen].filter(Boolean).join('\n\n') || 'Eerste run — genereer brede maar specifieke ideeën.'
+    const gebruikerPrompt = runData.data?.notitie
+      ? `\nGEBRUIKERSINSTRUCTIE (hoogste prioriteit — volg dit op):\n${runData.data.notitie}\n`
+      : ''
+
+    const contextBlok = [gebruikerPrompt, learnings, eerdereIdeeen].filter(Boolean).join('\n\n') || 'Eerste run — genereer brede maar specifieke ideeën.'
 
     // Claude bepaalt dynamische zoektermen op basis van learnings + eerdere ideeën
     const zoektermen = await bepaalZoektermen(contextBlok)

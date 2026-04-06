@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
-  void req // niet gebruikt maar nodig voor Next.js route signature
+  const body = await req.json().catch(() => ({}))
+  const notitie = body.notitie || null
 
   const { data: run, error } = await supabaseAdmin
     .from('pipeline_runs')
-    .insert({ status: 'running', huidige_stap: 1 })
+    .insert({ status: 'running', huidige_stap: 1, notitie })
     .select()
     .single()
 

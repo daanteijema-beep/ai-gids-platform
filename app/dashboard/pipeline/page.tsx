@@ -71,6 +71,8 @@ export default function PipelinePage() {
   const [bezig, setBezig] = useState(false)
   const [rejectReden, setRejectReden] = useState('')
   const [showReject, setShowReject] = useState<string | null>(null)
+  const [gebruikerPrompt, setGebruikerPrompt] = useState('')
+  const [showPrompt, setShowPrompt] = useState(false)
 
   const laadRuns = useCallback(async () => {
     const res = await fetch('/api/pipeline/list')
@@ -97,12 +99,17 @@ export default function PipelinePage() {
 
   async function startRun() {
     setBezig(true)
-    const res = await fetch('/api/pipeline/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    setShowPrompt(false)
+    const res = await fetch('/api/pipeline/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notitie: gebruikerPrompt.trim() || undefined }),
+    })
     if (res.ok) {
       const { run_id, next_agent } = await res.json()
       setActieveRun(run_id)
+      setGebruikerPrompt('')
       await laadRuns()
-      // Trigger de eerste agent (research-ideas) direct vanuit de browser
       if (next_agent) triggerAgent(next_agent, run_id)
     }
     setBezig(false)
@@ -179,19 +186,49 @@ export default function PipelinePage() {
   return (
     <div className="max-w-5xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Pipeline</h1>
           <p className="text-gray-500 mt-1">AI genereert ideeën → marketing → landingspagina → content → leads → outreach</p>
         </div>
         <button
-          onClick={startRun}
+          onClick={() => setShowPrompt(v => !v)}
           disabled={bezig}
           className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-bold px-6 py-3 rounded-xl transition flex items-center gap-2"
         >
-          {bezig ? <><span className="animate-spin">⚙️</span> Bezig...</> : <><span>🚀</span> Start nieuwe run</>}
+          {bezig ? <><span className="animate-spin">⚙️</span> Bezig...</> : <><span>🚀</span> Nieuwe run</>}
         </button>
       </div>
+
+      {/* Prompt invoer */}
+      {showPrompt && !bezig && (
+        <div className="bg-white border border-orange-200 rounded-xl p-4 mb-6 shadow-sm">
+          <p className="text-sm font-semibold text-slate-700 mb-2">
+            Geef de research agent een richting mee <span className="font-normal text-slate-400">(optioneel)</span>
+          </p>
+          <textarea
+            value={gebruikerPrompt}
+            onChange={e => setGebruikerPrompt(e.target.value)}
+            placeholder="Bijv: focus op de bouwsector, of zoek iets voor ZZP-ers in de zorg, of ik wil een tool voor horeca-eigenaren…"
+            rows={3}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-400 resize-none mb-3"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={startRun}
+              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 py-2 rounded-lg text-sm transition"
+            >
+              🚀 Start run
+            </button>
+            <button
+              onClick={() => { setShowPrompt(false); setGebruikerPrompt('') }}
+              className="text-slate-500 hover:text-slate-700 px-4 py-2 text-sm"
+            >
+              Annuleren
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Pipeline stappen legenda */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
