@@ -12,6 +12,12 @@ type FormField = {
   required: boolean
 }
 
+type Images = {
+  hero_banner?: string
+  instagram?: string[]
+  pdf_cover?: string
+}
+
 type Pdf = {
   id: string
   title: string
@@ -20,6 +26,7 @@ type Pdf = {
   price: number
   slug: string
   form_fields: FormField[]
+  images?: Images
 }
 
 type LandingPage = {
@@ -121,7 +128,13 @@ export default function LandingPage() {
       )}
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 text-white">
+      <section className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 text-white"
+        style={pdf.images?.hero_banner ? {
+          backgroundImage: `linear-gradient(to bottom right, rgba(79,70,229,0.85), rgba(109,40,217,0.9)), url(${pdf.images.hero_banner})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        } : undefined}
+      >
         <div className="max-w-6xl mx-auto px-6 py-16 lg:py-24 grid lg:grid-cols-2 gap-12 items-center">
           {/* Left: copy */}
           <div>

@@ -9,7 +9,7 @@ type Props = { params: Promise<{ id: string }> }
 async function getData(id: string) {
   const { data: pdf } = await supabaseAdmin
     .from('pdfs')
-    .select('*, pdf_ideas(niche, target_audience, research_rationale)')
+    .select('*, images, pdf_ideas(niche, target_audience, research_rationale)')
     .eq('id', id)
     .single()
 

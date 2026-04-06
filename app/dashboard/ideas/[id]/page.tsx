@@ -17,6 +17,7 @@ const INITIAL_STEPS: Step[] = [
   { key: 'pdf', label: 'PDF Template', description: 'Niche template aanmaken voor gepersonaliseerde PDFs', icon: '📄', status: 'waiting' },
   { key: 'mail', label: 'Email sequenties', description: 'Lead nurture emails + aankondiging aan bestaande leads', icon: '📧', status: 'waiting' },
   { key: 'social', label: 'Social media content', description: '21 posts voor Instagram, LinkedIn en TikTok', icon: '📱', status: 'waiting' },
+  { key: 'images', label: 'Afbeeldingen', description: 'Hero banner, Instagram posts en PDF cover genereren', icon: '🖼️', status: 'waiting' },
 ]
 
 type Idea = {

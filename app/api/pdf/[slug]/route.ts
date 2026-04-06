@@ -9,7 +9,7 @@ export async function GET(
 
   const { data: pdf } = await supabaseAdmin
     .from('pdfs')
-    .select('id, title, subtitle, description, price, slug, form_fields')
+    .select('id, title, subtitle, description, price, slug, form_fields, images')
     .eq('slug', slug)
     .eq('active', true)
     .single()
