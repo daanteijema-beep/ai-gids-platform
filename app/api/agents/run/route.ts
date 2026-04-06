@@ -39,6 +39,14 @@ export async function POST(req: NextRequest) {
     body: agent.method === 'POST' ? JSON.stringify(payload) : undefined,
   })
 
-  const data = await res.json()
+  // Vercel kan HTML teruggeven bij timeouts/crashes — vang dat op
+  const text = await res.text()
+  let data: unknown
+  try {
+    data = JSON.parse(text)
+  } catch {
+    console.error(`Agent ${agentId} gaf geen JSON terug (status ${res.status}):`, text.slice(0, 200))
+    return NextResponse.json({ error: `Agent ${agentId} gaf geen geldige response`, raw: text.slice(0, 200) }, { status: 502 })
+  }
   return NextResponse.json(data, { status: res.status })
 }
