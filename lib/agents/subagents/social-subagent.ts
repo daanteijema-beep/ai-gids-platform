@@ -15,7 +15,7 @@ function stripJson(text: string) {
 export async function runSocialSubagent(pdfId: string, pdfChapters: string[] = []): Promise<{ postsCreated: number; postsPublished: number }> {
   const { data: pdf } = await supabaseAdmin
     .from('pdfs')
-    .select('*, pdf_ideas(niche, target_audience, meta_hook)')
+    .select('*, pdf_ideas(niche, target_audience)')
     .eq('id', pdfId)
     .single()
 
