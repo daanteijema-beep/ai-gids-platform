@@ -245,50 +245,69 @@ export async function POST(req: NextRequest) {
 
   const { run_id } = await req.json()
 
-  // Log event
-  await supabaseAdmin.from('pipeline_analytics').insert({ run_id, event_type: 'run_gestart', stap: 1 })
+  // Altijd de status updaten, ook bij crash
+  async function markeerFout(reden: string) {
+    await supabaseAdmin
+      .from('pipeline_runs')
+      .update({ status: 'afgewezen', afgewezen_reden: reden })
+      .eq('id', run_id)
+  }
 
-  // Leer van eerdere campagnes
-  const learnings = await haalLearnings()
+  try {
+    // Log event
+    await supabaseAdmin.from('pipeline_analytics').insert({ run_id, event_type: 'run_gestart', stap: 1 })
 
-  // Claude bepaalt dynamische zoektermen op basis van learnings
-  const zoektermen = await bepaalZoektermen(learnings)
+    // Leer van eerdere campagnes
+    const learnings = await haalLearnings()
 
-  // Alle bronnen parallel ophalen — Apify calls krijgen max 20s timeout
-  const [reddit, producthunt, trends, linkedin] = await Promise.all([
-    haalReddit(zoektermen),
-    haalProductHunt(),
-    withTimeout(haalGoogleTrends(zoektermen), 20000, []),
-    withTimeout(haalLinkedIn(zoektermen), 20000, []),
-  ])
+    // Claude bepaalt dynamische zoektermen op basis van learnings
+    const zoektermen = await bepaalZoektermen(learnings)
 
-  const allData = [...reddit, ...producthunt, ...trends, ...linkedin]
-  const bronnenGebruikt = [...new Set(allData.map(d => d.bron))]
+    // Alle bronnen parallel ophalen — Apify calls krijgen max 20s timeout
+    const [reddit, producthunt, trends, linkedin] = await Promise.all([
+      haalReddit(zoektermen),
+      haalProductHunt(),
+      withTimeout(haalGoogleTrends(zoektermen), 20000, []),
+      withTimeout(haalLinkedIn(zoektermen), 20000, []),
+    ])
 
-  const ideeen = await genereerIdeeen(allData, learnings, zoektermen)
+    const allData = [...reddit, ...producthunt, ...trends, ...linkedin]
+    const bronnenGebruikt = [...new Set(allData.map(d => d.bron))]
 
-  const inserts = ideeen.map((idee: Record<string, unknown>) => ({
-    run_id,
-    naam: idee.naam,
-    tagline: idee.tagline,
-    beschrijving: idee.beschrijving,
-    doelgroep: idee.doelgroep,
-    pijnpunt: idee.pijnpunt,
-    type: idee.type,
-    prijsindicatie: idee.prijsindicatie,
-    validatiescore: idee.validatiescore,
-    bronnen: { gebruikt: bronnenGebruikt, markt_bewijs: idee.markt_bewijs, onderscheidend: idee.onderscheidend, zoektermen },
-  }))
+    const ideeen = await genereerIdeeen(allData, learnings, zoektermen)
 
-  const { error } = await supabaseAdmin.from('product_ideas').insert(inserts)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const inserts = ideeen.map((idee: Record<string, unknown>) => ({
+      run_id,
+      naam: idee.naam,
+      tagline: idee.tagline,
+      beschrijving: idee.beschrijving,
+      doelgroep: idee.doelgroep,
+      pijnpunt: idee.pijnpunt,
+      type: idee.type,
+      prijsindicatie: idee.prijsindicatie,
+      validatiescore: idee.validatiescore,
+      bronnen: { gebruikt: bronnenGebruikt, markt_bewijs: idee.markt_bewijs, onderscheidend: idee.onderscheidend, zoektermen },
+    }))
 
-  await supabaseAdmin
-    .from('pipeline_runs')
-    .update({ status: 'wacht_op_goedkeuring', huidige_stap: 1 })
-    .eq('id', run_id)
+    const { error } = await supabaseAdmin.from('product_ideas').insert(inserts)
+    if (error) {
+      await markeerFout(`DB insert mislukt: ${error.message}`)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
-  return NextResponse.json({ ok: true, ideeen: ideeen.length, bronnen: bronnenGebruikt, zoektermen })
+    await supabaseAdmin
+      .from('pipeline_runs')
+      .update({ status: 'wacht_op_goedkeuring', huidige_stap: 1 })
+      .eq('id', run_id)
+
+    return NextResponse.json({ ok: true, ideeen: ideeen.length, bronnen: bronnenGebruikt, zoektermen })
+
+  } catch (e) {
+    const reden = e instanceof Error ? e.message : String(e)
+    console.error('Research agent crash:', reden)
+    await markeerFout(`Agent crash: ${reden}`)
+    return NextResponse.json({ error: reden }, { status: 500 })
+  }
 }
 
 export const GET = POST
