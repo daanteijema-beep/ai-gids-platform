@@ -25,7 +25,7 @@ export async function generatePdfContent(opts: {
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 5000,
+    max_tokens: 3000,
     messages: [{
       role: 'user',
       content: `Schrijf een complete, praktische PDF gids voor Nederlandse ZZP'ers. Compact maar waardevol.
@@ -55,7 +55,7 @@ STRUCTUUR (geef terug als JSON, GEEN markdown blokken):
   "outro": "1-2 zinnen afsluiting met concrete volgende stap + motivatie."
 }
 
-Schrijf PRECIES 4 hoofdstukken van elk ~200-250 woorden. Focus op actionable content.`
+Schrijf PRECIES 3 hoofdstukken van elk ~150 woorden. Kompakt, direct, actionable.`
     }]
   })
 

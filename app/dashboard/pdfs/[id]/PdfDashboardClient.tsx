@@ -57,7 +57,14 @@ export default function PdfDashboardClient({ data }: { data: any }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pdfId: pdf.id }),
       })
-      const data = await res.json()
+      // Handle non-JSON responses (timeouts return HTML error pages)
+      const text = await res.text()
+      let data: any = {}
+      try { data = JSON.parse(text) } catch {
+        setStepStatus(s => ({ ...s, [step]: 'error' }))
+        setStepResult(s => ({ ...s, [step]: res.status === 504 ? 'Timeout — probeer opnieuw' : `Server fout (${res.status})` }))
+        return
+      }
       if (res.ok) {
         setStepStatus(s => ({ ...s, [step]: 'done' }))
         const summary = step === 'pdf' ? `${data.chapters} hoofdstukken` :
