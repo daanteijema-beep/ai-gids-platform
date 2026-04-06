@@ -86,11 +86,29 @@ create table if not exists marketing_content (
 );
 
 -- ============================================================
+-- TREND INSIGHTS (door Trend Scout agent)
+-- ============================================================
+create table if not exists content_insights (
+  id uuid default gen_random_uuid() primary key,
+  created_at timestamptz default now(),
+  niche_id uuid references niches(id) on delete cascade,
+  bron text not null check (bron in ('google_trends', 'linkedin', 'reddit', 'concurrent')),
+  zoekterm text not null,
+  titel text not null,
+  samenvatting text,
+  ruwe_data jsonb,
+  relevantie_score integer default 5,    -- 1-10
+  aanbevolen_hook text,                  -- Claude's aanbevolen openingszin
+  week text                              -- "2026-W14" formaat
+);
+
+-- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
 alter table niches enable row level security;
 alter table leads enable row level security;
 alter table outreach_targets enable row level security;
 alter table marketing_content enable row level security;
+alter table content_insights enable row level security;
 
 -- Service key bypasses RLS — geen extra policies nodig voor server-side gebruik

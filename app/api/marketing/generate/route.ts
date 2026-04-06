@@ -100,7 +100,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Onbekend type' }, { status: 400 })
   }
 
-  const prompt = promptFn(niche.naam, niche.sector_zoekterm)
+  // Haal recentste trend insights op voor deze niche
+  const { data: insights } = await supabaseAdmin
+    .from('content_insights')
+    .select('bron, titel, samenvatting, aanbevolen_hook')
+    .eq('niche_id', niche_id)
+    .order('created_at', { ascending: false })
+    .limit(6)
+
+  const trendContext = insights?.length
+    ? `\n\nACTUELE TREND DATA VOOR DEZE NICHE (gebruik deze inzichten):\n` +
+      insights.map(i => `[${i.bron}] ${i.titel}: ${i.samenvatting}`).join('\n') +
+      (insights[0]?.aanbevolen_hook ? `\n\nAanbevolen hook deze week: "${insights[0].aanbevolen_hook}"` : '')
+    : ''
+
+  const prompt = promptFn(niche.naam, niche.sector_zoekterm) + trendContext
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
