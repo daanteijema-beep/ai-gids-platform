@@ -124,8 +124,8 @@ async function haalGoogleTrends(zoektermen: string[]): Promise<{ bron: string; t
     const run = await startRes.json()
     const runId = run?.data?.id
     if (!runId) return []
-    for (let i = 0; i < 5; i++) {
-      await new Promise(r => setTimeout(r, 10000))
+    for (let i = 0; i < 3; i++) {
+      await new Promise(r => setTimeout(r, 5000))
       const pd = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`).then(r => r.json())
       if (pd?.data?.status === 'SUCCEEDED') {
         const items = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${token}&limit=10`).then(r => r.json())
@@ -160,8 +160,8 @@ async function haalLinkedIn(zoektermen: string[]): Promise<{ bron: string; titel
     const run = await startRes.json()
     const runId = run?.data?.id
     if (!runId) return []
-    for (let i = 0; i < 4; i++) {
-      await new Promise(r => setTimeout(r, 10000))
+    for (let i = 0; i < 3; i++) {
+      await new Promise(r => setTimeout(r, 5000))
       const pd = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`).then(r => r.json())
       if (pd?.data?.status === 'SUCCEEDED') {
         const items = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${token}&limit=8`).then(r => r.json())
@@ -223,6 +223,22 @@ Alleen JSON.`
   return JSON.parse(strip((msg.content[0] as { text: string }).text))
 }
 
+// ─── Timeout helper ───────────────────────────────────────────────────────────
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), ms)
+  })
+  try {
+    const result = await Promise.race([promise, timeout])
+    clearTimeout(timer!)
+    return result
+  } catch {
+    clearTimeout(timer!)
+    return fallback
+  }
+}
+
 // ─── Handler ───────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -238,12 +254,12 @@ export async function POST(req: NextRequest) {
   // Claude bepaalt dynamische zoektermen op basis van learnings
   const zoektermen = await bepaalZoektermen(learnings)
 
-  // Alle bronnen parallel ophalen
+  // Alle bronnen parallel ophalen — Apify calls krijgen max 20s timeout
   const [reddit, producthunt, trends, linkedin] = await Promise.all([
     haalReddit(zoektermen),
     haalProductHunt(),
-    haalGoogleTrends(zoektermen),
-    haalLinkedIn(zoektermen),
+    withTimeout(haalGoogleTrends(zoektermen), 20000, []),
+    withTimeout(haalLinkedIn(zoektermen), 20000, []),
   ])
 
   const allData = [...reddit, ...producthunt, ...trends, ...linkedin]
