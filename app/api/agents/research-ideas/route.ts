@@ -17,9 +17,6 @@ function strip(text: string) {
 }
 
 // ─── Leerlogica: haalt op wat eerder werkte ────────────────────────────────────
-// Voordat we zoeken, kijken we in campaign_learnings wat al bewezen heeft gewerkt.
-// Dit voorkomt dat de agent steeds dezelfde ideeën genereert en stuurt hem
-// richting onontgonnen markten of bewezen formaten.
 async function haalLearnings(): Promise<string> {
   const { data } = await supabaseAdmin
     .from('campaign_learnings')
@@ -27,7 +24,7 @@ async function haalLearnings(): Promise<string> {
     .order('created_at', { ascending: false })
     .limit(10)
 
-  if (!data?.length) return 'Geen eerdere campagne data — genereer brede ideeën.'
+  if (!data?.length) return ''
 
   return `EERDERE CAMPAGNE INZICHTEN (gebruik dit om betere ideeën te genereren):
 ${data.map(l =>
@@ -35,6 +32,28 @@ ${data.map(l =>
 ).join('\n')}
 
 Vermijd niches/types die al goed gedekt zijn. Focus op witte vlekken.`
+}
+
+// ─── Eerder gegenereerde ideeën ophalen ──────────────────────────────────────
+// Leest alle eerder gegenereerde productideeën (ook afgewezen) zodat de agent
+// niet dezelfde namen, sectoren of pijnpunten herhaalt.
+async function haalEerdereIdeeen(): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from('product_ideas')
+    .select('naam, doelgroep, pijnpunt, type, geselecteerd')
+    .order('created_at', { ascending: false })
+    .limit(30)
+
+  if (!data?.length) return ''
+
+  const gekozen = data.filter(i => i.geselecteerd).map(i => `  ✓ ${i.naam} (${i.doelgroep})`)
+  const afgewezen = data.filter(i => !i.geselecteerd).map(i => `  ✗ ${i.naam} (${i.doelgroep}): ${i.pijnpunt}`)
+
+  return `EERDER GEGENEREERDE IDEEËN — GEBRUIK DEZE NIET OPNIEUW:
+${gekozen.length ? `Gekozen (al in productie):\n${gekozen.join('\n')}` : ''}
+${afgewezen.length ? `Afgewezen/niet gekozen (NIET herhalen, ook niet met andere naam):\n${afgewezen.join('\n')}` : ''}
+
+Genereer ideeën die qua sector, doelgroep EN pijnpunt totaal anders zijn dan bovenstaande.`
 }
 
 // ─── Claude bepaalt dynamische zoektermen ─────────────────────────────────────
@@ -265,11 +284,16 @@ export async function POST(req: NextRequest) {
     // Log event
     await supabaseAdmin.from('pipeline_analytics').insert({ run_id, event_type: 'run_gestart', stap: 1 })
 
-    // Leer van eerdere campagnes
-    const learnings = await haalLearnings()
+    // Leer van eerdere campagnes + eerder gegenereerde ideeën parallel ophalen
+    const [learnings, eerdereIdeeen] = await Promise.all([
+      haalLearnings(),
+      haalEerdereIdeeen(),
+    ])
 
-    // Claude bepaalt dynamische zoektermen op basis van learnings
-    const zoektermen = await bepaalZoektermen(learnings)
+    const contextBlok = [learnings, eerdereIdeeen].filter(Boolean).join('\n\n') || 'Eerste run — genereer brede maar specifieke ideeën.'
+
+    // Claude bepaalt dynamische zoektermen op basis van learnings + eerdere ideeën
+    const zoektermen = await bepaalZoektermen(contextBlok)
 
     // Alle bronnen parallel ophalen — Apify calls krijgen max 20s timeout
     const [reddit, producthunt, trends, linkedin] = await Promise.all([
@@ -282,7 +306,7 @@ export async function POST(req: NextRequest) {
     const allData = [...reddit, ...producthunt, ...trends, ...linkedin]
     const bronnenGebruikt = [...new Set(allData.map(d => d.bron))]
 
-    const ideeen = await genereerIdeeen(allData, learnings, zoektermen)
+    const ideeen = await genereerIdeeen(allData, contextBlok, zoektermen)
 
     const inserts = ideeen.map((idee: Record<string, unknown>) => ({
       run_id,
