@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function DashboardAccessPage() {
+function DashboardAccessForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
@@ -93,5 +93,13 @@ export default function DashboardAccessPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function DashboardAccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#070C18]" />}>
+      <DashboardAccessForm />
+    </Suspense>
   )
 }
