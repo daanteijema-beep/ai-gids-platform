@@ -109,24 +109,42 @@ async function haalReddit(zoektermen: string[]): Promise<{ bron: string; titel: 
   return results
 }
 
-// ─── Bron 2: ProductHunt via Firecrawl ────────────────────────────────────────
+// ─── Bron 2: ProductHunt GraphQL API ─────────────────────────────────────────
+// Haalt de meest geupvote AI-tools van deze week op via de officiële API.
+// Veel betrouwbaarder dan scrapen: echte data, snel, geen rate limits.
 async function haalProductHunt(): Promise<{ bron: string; titel: string; tekst: string }[]> {
-  const key = process.env.FIRECRAWL_API_KEY
-  if (!key) return []
+  const token = process.env.PRODUCTHUNT_API_KEY
+  if (!token) return []
   try {
-    const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    const query = `{
+      posts(first: 12, topic: "artificial-intelligence", order: VOTES) {
+        edges {
+          node {
+            name
+            tagline
+            description
+            votesCount
+            topics { edges { node { name } } }
+          }
+        }
+      }
+    }`
+    const res = await fetch('https://api.producthunt.com/v2/api/graphql', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        url: 'https://www.producthunt.com/topics/artificial-intelligence',
-        formats: ['markdown'],
-        onlyMainContent: true,
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query }),
     })
     if (!res.ok) return []
     const data = await res.json()
-    const tekst = (data?.data?.markdown || '').slice(0, 3000)
-    return tekst ? [{ bron: 'producthunt', titel: 'Trending AI tools op ProductHunt', tekst }] : []
+    const posts = data?.data?.posts?.edges || []
+    return posts.map((e: { node: { name: string; tagline: string; description?: string; votesCount: number } }) => ({
+      bron: 'producthunt',
+      titel: `${e.node.name} — ${e.node.votesCount} upvotes`,
+      tekst: `${e.node.tagline}. ${(e.node.description || '').slice(0, 250)}`,
+    }))
   } catch { return [] }
 }
 

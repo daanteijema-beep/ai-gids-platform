@@ -16,6 +16,52 @@ function strip(text: string) {
   return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]).catch(() => fallback)
+}
+
+// ─── LinkedIn + branche data via Apify (max 10s totaal) ───────────────────────
+async function haalBrancheData(doelgroep: string): Promise<string> {
+  const token = process.env.APIFY_TOKEN
+  if (!token) return ''
+  try {
+    const startRes = await fetch(
+      `https://api.apify.com/v2/acts/apify~google-search-scraper/runs?token=${token}&memory=256`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queries: `site:linkedin.com/posts "${doelgroep}" AI tool automatisering Nederland 2026`,
+          resultsPerPage: 5, maxPagesPerQuery: 1, languageCode: 'nl',
+        }),
+      }
+    )
+    if (!startRes.ok) return ''
+    const run = await startRes.json()
+    const runId = run?.data?.id
+    if (!runId) return ''
+
+    // Max 2 polls van 3s = 6s wacht
+    for (let i = 0; i < 2; i++) {
+      await new Promise(r => setTimeout(r, 3000))
+      const pd = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`).then(r => r.json())
+      if (pd?.data?.status === 'SUCCEEDED') {
+        const items = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${token}&limit=4`).then(r => r.json())
+        if (Array.isArray(items) && items.length) {
+          const snippets = (items as Array<{ title?: string; snippet?: string }>)
+            .slice(0, 3).map(r => `- ${r.title}: ${r.snippet}`).join('\n')
+          return `\nACTUELE LINKEDIN DATA over "${doelgroep}":\n${snippets}`
+        }
+      }
+      if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(pd?.data?.status)) break
+    }
+  } catch { /* skip */ }
+  return ''
+}
+
 async function haalMarketingLearnings(productType: string): Promise<string> {
   const { data } = await supabaseAdmin
     .from('campaign_learnings')
@@ -58,7 +104,11 @@ export async function POST(req: NextRequest) {
       metadata: { product_naam: idee.naam, product_type: idee.type },
     })
 
-    const marketingLearnings = await haalMarketingLearnings(idee.type)
+    // LinkedIn branche data ophalen met max 10s timeout
+    const [brancheData, marketingLearnings] = await Promise.all([
+      withTimeout(haalBrancheData(idee.doelgroep), 10000, ''),
+      haalMarketingLearnings(idee.type),
+    ])
 
     const prompt = `Je bent een fractional CMO gespecialiseerd in B2B SaaS voor het Nederlandse MKB.
 Gebruik de volgende bewezen marketing frameworks om een concreet plan te maken.
@@ -70,6 +120,7 @@ Doelgroep: ${idee.doelgroep}
 Pijnpunt: ${idee.pijnpunt}
 Type: ${idee.type}
 Prijs: ${idee.prijsindicatie}
+${brancheData}
 ${marketingLearnings}
 
 FRAMEWORK 1 — ICP (Ideal Customer Profile):
