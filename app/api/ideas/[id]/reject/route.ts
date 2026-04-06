@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isDashboardOrCronAuthorizedRequest } from '@/lib/request-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(
@@ -7,8 +8,7 @@ export async function POST(
 ) {
   const { id } = await params
 
-  const auth = req.headers.get('x-dashboard-password')
-  if (auth !== process.env.DASHBOARD_PASSWORD) {
+  if (!isDashboardOrCronAuthorizedRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

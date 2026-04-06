@@ -36,7 +36,6 @@ export default function IdeaCard({ idea }: { idea: Idea }) {
     try {
       const res = await fetch(`/api/ideas/${idea.id}/reject`, {
         method: 'POST',
-        headers: { 'x-dashboard-password': 'admin123' },
       })
       if (res.ok) setRejected(true)
     } catch {

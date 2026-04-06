@@ -1,10 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
+import {
+  getSupabaseClientKey,
+  getSupabaseServiceRoleKey,
+  getSupabaseUrl,
+} from '@/lib/env'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = getSupabaseUrl()
+const supabaseClientKey = getSupabaseClientKey()
+const supabaseServiceKey = getSupabaseServiceRoleKey()
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseClientKey)
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 // ============================================================

@@ -32,10 +32,6 @@ export default function OutreachPage() {
   const [lastRun, setLastRun] = useState<string | null>(null)
   const [filter, setFilter] = useState('all')
 
-  useEffect(() => {
-    fetchTargets()
-  }, [])
-
   async function fetchTargets() {
     setLoading(true)
     const res = await fetch('/api/outreach/list')
@@ -46,14 +42,44 @@ export default function OutreachPage() {
     setLoading(false)
   }
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadTargets() {
+      setLoading(true)
+
+      try {
+        const res = await fetch('/api/outreach/list')
+        if (!res.ok || cancelled) {
+          return
+        }
+
+        const data = await res.json()
+        if (!cancelled) {
+          setTargets(data.targets || [])
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadTargets()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   async function runOutreach() {
     setRunning(true)
     setLastRun(null)
-    const res = await fetch('/api/outreach', { method: 'POST', headers: { authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET || 'dev'}` } })
+    const res = await fetch('/api/outreach', { method: 'POST' })
     const data = await res.json()
     setLastRun(JSON.stringify(data, null, 2))
     setRunning(false)
-    fetchTargets()
+    void fetchTargets()
   }
 
   const filtered = filter === 'all' ? targets : targets.filter(t => t.status === filter)

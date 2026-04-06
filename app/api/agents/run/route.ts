@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-const SUPABASE_URL = 'https://knagzemkqtjuenlmkeff.supabase.co/functions/v1'
+import { getSupabaseFunctionUrl } from '@/lib/env'
 
 // Agents die via Supabase Edge Functions draaien (geen 60s Vercel limiet)
 const SUPABASE_AGENTS: Record<string, string> = {
-  'research-ideas':    `${SUPABASE_URL}/research-ideas`,
-  'marketing-plan':    `${SUPABASE_URL}/marketing-plan`,
-  'lead-gen-pipeline': `${SUPABASE_URL}/lead-gen-pipeline`,
-  'outreach-writer':   `${SUPABASE_URL}/outreach-writer`,
+  'research-ideas': getSupabaseFunctionUrl('research-ideas'),
+  'marketing-plan': getSupabaseFunctionUrl('marketing-plan'),
+  'lead-gen-pipeline': getSupabaseFunctionUrl('lead-gen-pipeline'),
+  'outreach-writer': getSupabaseFunctionUrl('outreach-writer'),
 }
 
 const AGENTS: Record<string, { path: string; method: string }> = {

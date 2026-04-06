@@ -7,15 +7,15 @@
 import { createClient } from 'npm:@supabase/supabase-js'
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-const BASE = 'https://knagzemkqtjuenlmkeff.supabase.co/functions/v1'
+const baseUrl = `${Deno.env.get('SUPABASE_URL')!.replace(/\/$/, '')}/functions/v1`
 
 const AGENT_PER_STAP: Record<number, string> = {
-  1: `${BASE}/research-ideas`,
-  2: `${BASE}/marketing-plan`,
-  3: `${BASE}/landing-page-agent`,
-  4: `${BASE}/content-creator`,
-  5: `${BASE}/lead-gen-pipeline`,
-  6: `${BASE}/outreach-writer`,
+  1: `${baseUrl}/research-ideas`,
+  2: `${baseUrl}/marketing-plan`,
+  3: `${baseUrl}/landing-page-agent`,
+  4: `${baseUrl}/content-creator`,
+  5: `${baseUrl}/lead-gen-pipeline`,
+  6: `${baseUrl}/outreach-writer`,
 }
 
 Deno.serve(async (req: Request) => {

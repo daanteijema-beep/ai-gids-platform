@@ -75,10 +75,7 @@ export default function AgentButtons() {
     setResults(r => ({ ...r, [agent.key]: {} }))
 
     try {
-      const res = await fetch(agent.endpoint, {
-        method: 'POST',
-        headers: { 'x-cron-secret': 'a9f2c4e8b1d6f3a7e0c5b2d9f4a1e8c3b6d0f7a2e5c8b3d1f6a9e4c7b0d5f2a8' },
-      })
+      const res = await fetch(agent.endpoint, { method: 'POST' })
       const data: AgentResult = await res.json()
       setResults(r => ({ ...r, [agent.key]: data }))
       setStatuses(s => ({ ...s, [agent.key]: data.error ? 'error' : 'done' }))

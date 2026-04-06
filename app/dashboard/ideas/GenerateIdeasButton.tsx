@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function GenerateIdeasButton({ secret }: { secret: string }) {
+export default function GenerateIdeasButton() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [message, setMessage] = useState('')
   const router = useRouter()
@@ -12,9 +12,7 @@ export default function GenerateIdeasButton({ secret }: { secret: string }) {
     setStatus('loading')
     setMessage('')
     try {
-      const res = await fetch(`/api/agents/research?secret=${secret}`, {
-        method: 'GET',
-      })
+      const res = await fetch('/api/agents/research', { method: 'POST' })
       const data = await res.json()
       if (res.ok && data.success) {
         setStatus('done')

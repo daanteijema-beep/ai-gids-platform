@@ -2,18 +2,12 @@ export const maxDuration = 300
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isDashboardOrCronAuthorizedRequest } from '@/lib/request-auth'
 import { Resend } from 'resend'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const resend = new Resend(process.env.RESEND_API_KEY)
-
-function isAuthorized(req: NextRequest) {
-  const auth = req.headers.get('authorization') || ''
-  const secret = req.nextUrl.searchParams.get('secret') || ''
-  const token = auth.replace('Bearer ', '')
-  return token === process.env.CRON_SECRET || secret === process.env.CRON_SECRET || token === 'dev'
-}
 
 function stripJson(text: string) {
   return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
@@ -131,7 +125,7 @@ Alleen de mail-body (geen onderwerpregel).`,
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAuthorized(req)) {
+  if (!isDashboardOrCronAuthorizedRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

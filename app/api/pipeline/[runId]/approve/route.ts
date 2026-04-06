@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getSupabaseFunctionUrl } from '@/lib/env'
 import { supabaseAdmin } from '@/lib/supabase'
 
-const ORCHESTRATOR_URL = 'https://knagzemkqtjuenlmkeff.supabase.co/functions/v1/orchestrator'
+const ORCHESTRATOR_URL = getSupabaseFunctionUrl('orchestrator')
 
 export async function POST(
   req: NextRequest,
