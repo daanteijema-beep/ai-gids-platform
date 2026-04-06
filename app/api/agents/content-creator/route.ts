@@ -89,41 +89,64 @@ async function schrijfPosts(
   const trendingThemas = (socialPlan?.linkedin?.trending_themas as string[])?.join(', ') || ''
   const metaConcept = socialPlan?.meta?.creatief_concept || ''
 
-  const prompt = `Je schrijft DEFINITIEVE social media posts — klaar om direct te plaatsen. Geen placeholders.
+  // Meta Ads Advantage+ structuur voor Meta post
+  // LinkedIn: thought leadership haak → inzicht → bewijs → zachte CTA
+  // Instagram: emotioneel + visueel, emoji-gedreven
+  const positionering = (socialPlan as Record<string, unknown>)?.positionering as string || ''
+  const prompt = `Je schrijft DEFINITIEVE social media posts voor ${idee.naam} — publicatieklaar, geen placeholders.
 
-Product: ${idee.naam} — ${idee.tagline}
-Doelgroep: ${icp.functietitel || idee.doelgroep}
-Pijnpunt: ${idee.pijnpunt}
-Kernboodschappen: ${keyMessages.slice(0, 3).join(' | ')}
-Prijs: ${idee.prijsindicatie}
+PRODUCT: ${idee.naam} — ${idee.tagline}
+DOELGROEP: ${icp.functietitel || idee.doelgroep}
+PIJNPUNT: ${idee.pijnpunt}
+KERNBOODSCHAPPEN: ${keyMessages.slice(0, 3).join(' | ')}
+PRIJS: ${idee.prijsindicatie}
+POSITIONERING: ${positionering}
 LinkedIn haak-formule: ${linkedinHaak}
 Trending thema's: ${trendingThemas}
 Meta creatief concept: ${metaConcept}
 
-Schrijf 3 definitieve posts met:
-- Geen [invulvelden] of placeholders — alles uitgeschreven
-- Echte emoji's, echte hashtags
-- Klaar om te kopiëren en plakken
+PLATFORM-SPECIFIEKE EISEN:
 
-JSON:
+LINKEDIN (thought leadership structuur):
+- Begin met een statement die STOPT met scrollen: stelling, statistiek, of contraire visie
+- Structuur: haak → herkenbaar probleem uitlichten → inzicht/draaipunt → zachte CTA
+- 150-250 woorden, professioneel maar menselijk
+- Geen bullet points in de eerste alinea
+- 3-5 relevante hashtags onderaan
+
+META (Advantage+ advertentie structuur):
+- Eerste 3 woorden bepalen of iemand stopt — begin met het pijnpunt of resultaat
+- Direct, resultaatgericht, urgentie zonder druk
+- 80-120 woorden
+- Duidelijke CTA aan het einde (geen vraag, een instructie)
+- 2-3 hashtags
+
+INSTAGRAM (emotioneel + visueel):
+- Emoji's als structuurelement, niet als decoratie
+- Begin met een vraag die de doelgroep zichzelf herkent
+- Bullets voor leesbaarheid op mobiel
+- 60-90 woorden
+- 8-10 hashtags: mix groot (#ondernemen 500K+), midden (#ZZPnederland 50K), niche
+
+JSON (geen [...] of placeholders, alles volledig uitgeschreven):
 {
   "linkedin": {
-    "headline": "headline voor op de afbeelding (max 8 woorden, pakkend)",
-    "tekst": "volledige LinkedIn post, 150-250 woorden. Begin met haak-formule. Geen [...]",
-    "hashtags": ["#relevant1", "#relevant2", "#relevant3", "#relevant4", "#relevant5"],
-    "foto_zoekterm": "Engelse zoekterm stockfoto max 3 woorden"
+    "headline": "8 woorden max, pakkende zin voor op de afbeelding",
+    "tekst": "volledige post 150-250 woorden",
+    "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4", "#hashtag5"],
+    "foto_zoekterm": "3 Engelse woorden voor Pexels zoekopdracht"
   },
   "meta": {
-    "headline": "headline voor afbeelding (max 6 woorden)",
-    "tekst": "volledige Meta post, 80-120 woorden. Direct en resultaatgericht. Geen [...]",
-    "hashtags": ["#tag1", "#tag2", "#tag3"],
-    "foto_zoekterm": "Engelse zoekterm"
+    "headline": "6 woorden max voor op de afbeelding",
+    "tekst": "volledige post 80-120 woorden",
+    "hashtags": ["#hashtag1", "#hashtag2"],
+    "foto_zoekterm": "3 Engelse woorden"
   },
   "instagram": {
-    "headline": "headline voor afbeelding (max 6 woorden)",
-    "tekst": "volledige Instagram post, 60-90 woorden met emoji's. Geen [...]",
-    "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5", "#tag6", "#tag7", "#tag8"],
-    "foto_zoekterm": "Engelse zoekterm"
+    "headline": "6 woorden max voor op de afbeelding",
+    "tekst": "volledige post 60-90 woorden met emoji's",
+    "hashtags": ["#h1", "#h2", "#h3", "#h4", "#h5", "#h6", "#h7", "#h8", "#h9", "#h10"],
+    "foto_zoekterm": "3 Engelse woorden"
   }
 }
 Alleen JSON.`

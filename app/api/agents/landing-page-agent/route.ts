@@ -54,46 +54,64 @@ export async function POST(req: NextRequest) {
   const icp = (marketingPlan.icp as Record<string, string>) || {}
   const keywords = (marketingPlan.zoekwoorden as Record<string, string[]>) || {}
 
-  // Claude schrijft volledige landingspagina copy.
-  // Features worden als concrete voordelen geschreven, niet als functielijst.
-  // FAQ is gebaseerd op echte bezwaren van de doelgroep.
-  // SEO: meta title max 60 tekens, description max 155 tekens.
-  const prompt = `Je bent een conversion copywriter die landingspagina's schrijft voor AI-tools voor Nederlandse kleine ondernemers.
+  // SEO-copy structuur gebaseerd op 30x-seo-content-writer framework:
+  // Hero → Pain/Gain → Features als uitkomsten → Social proof → FAQ bezwaren → CTA
+  const positionering = (marketingPlan as Record<string, unknown>).positionering as string || ''
+  const prompt = `Je bent een senior conversion copywriter en SEO-specialist.
+Schrijf een volledige, publicatieklare landingspagina voor een AI-tool voor Nederlandse kleine ondernemers.
+Gebruik de 30x-seo-content-writer aanpak: elke sectie heeft een specifiek doel in de funnel.
 
-Product: ${idee.naam}
+PRODUCT INPUT:
+Naam: ${idee.naam}
 Tagline: ${idee.tagline}
 Beschrijving: ${idee.beschrijving}
 Doelgroep: ${icp.functietitel || idee.doelgroep}
 Pijnpunt: ${idee.pijnpunt}
 Prijs: ${idee.prijsindicatie}
-Kernboodschappen: ${JSON.stringify(marketingPlan.key_messages)}
-Primaire zoekwoorden: ${keywords.primair?.join(', ') || ''}
+Positionering: ${positionering}
+Kernboodschappen: ${(marketingPlan.key_messages as string[])?.join(' | ')}
+Primaire zoekwoorden: ${keywords.primair?.join(', ')}
+Long-tail zoekwoorden: ${keywords.long_tail?.join(', ')}
 
-Schrijf volledige landingspagina copy als JSON:
+SCHRIJFREGELS (30x-seo-content-writer):
+1. Hero headline: SPECIFIEK pijnpunt of gewenste uitkomst — geen generiek "bespaar tijd"
+2. Hero subline: WIE het voor is + WAT het oplost — max 2 zinnen
+3. Features: schrijf als UITKOMSTEN, niet als functies. "Offerte in 2 minuten" > "Offertetool"
+4. Sociaal bewijs: realistisch (naam + sector + concreet resultaat). Geen "geweldig product!"
+5. FAQ: echte bezwaren van deze doelgroep. Antwoorden overtuigend maar eerlijk.
+6. CTA: actief, urgentie, max 5 woorden. "Start vandaag gratis" > "Aanmelden"
+7. Meta title: bevat primair zoekwoord + USP, max 60 tekens
+8. Meta description: bevat zoekwoord + pijnpunt + oplossing + CTA, max 155 tekens
+
+JSON (alleen JSON, klaar voor publicatie — geen placeholders):
 {
-  "hero_headline": "pakkende hoofdkop, max 8 woorden, bevat pijnpunt of uitkomst",
-  "hero_subline": "2 zinnen: wat het doet en voor wie, max 20 woorden",
+  "hero_headline": "max 8 woorden, bevat pijnpunt of gewenste uitkomst",
+  "hero_subline": "2 zinnen: voor wie + wat het oplost, max 25 woorden",
   "features": [
-    { "icon": "emoji", "titel": "feature naam", "tekst": "concreet voordeel in 1 zin" },
+    { "icon": "passend emoji", "titel": "uitkomst in 3-4 woorden", "tekst": "concreet voordeel in 1 zin met getal of tijdsindicatie" },
     { "icon": "emoji", "titel": "...", "tekst": "..." },
     { "icon": "emoji", "titel": "...", "tekst": "..." }
   ],
   "voordelen": [
-    "voordeel 1 als bullet (max 8 woorden)",
+    "voordeel als actieve zin, max 10 woorden",
     "voordeel 2",
     "voordeel 3",
     "voordeel 4",
     "voordeel 5"
   ],
-  "sociaal_bewijs": "fictief maar realistisch testimonial van een tevreden gebruiker",
+  "sociaal_bewijs": {
+    "citaat": "concreet resultaat: 'Ik bespaar nu 3 uur per week op...' — GEEN generieke lof",
+    "naam": "voornaam + achternaam initiaal",
+    "functie": "functietitel + sector"
+  },
   "faq": [
-    { "vraag": "bezwaar 1 van de doelgroep", "antwoord": "geruststellend antwoord" },
-    { "vraag": "bezwaar 2", "antwoord": "..." },
-    { "vraag": "bezwaar 3", "antwoord": "..." }
+    { "vraag": "echt bezwaar van doelgroep", "antwoord": "eerlijk, geruststellend, max 2 zinnen" },
+    { "vraag": "bezwaar 2 (bijv. prijs of techniek)", "antwoord": "..." },
+    { "vraag": "bezwaar 3 (bijv. tijd of vertrouwen)", "antwoord": "..." }
   ],
-  "cta_tekst": "actietekst voor de knop, max 5 woorden",
-  "meta_title": "SEO paginatitel, max 60 tekens",
-  "meta_description": "SEO omschrijving, max 155 tekens, bevat zoekwoord"
+  "cta_tekst": "max 5 woorden, actief en urgentie",
+  "meta_title": "max 60 tekens, bevat primair zoekwoord",
+  "meta_description": "max 155 tekens, bevat zoekwoord + uitkomst + CTA"
 }
 Alleen JSON.`
 
@@ -136,6 +154,11 @@ Alleen JSON.`
 
   const slug = slugify(idee.naam)
 
+  // sociaal_bewijs kan object of string zijn afhankelijk van Claude output
+  const sociaalBewijs = typeof copy.sociaal_bewijs === 'object'
+    ? copy.sociaal_bewijs
+    : { citaat: copy.sociaal_bewijs, naam: '', functie: '' }
+
   const { error } = await supabaseAdmin.from('landing_pages').insert({
     run_id,
     product_idea_id: run.product_idea_id,
@@ -144,6 +167,7 @@ Alleen JSON.`
     hero_subline: copy.hero_subline,
     features: copy.features,
     voordelen: copy.voordelen,
+    sociaal_bewijs: sociaalBewijs,
     faq: copy.faq,
     cta_tekst: copy.cta_tekst,
     meta_title: copy.meta_title,
