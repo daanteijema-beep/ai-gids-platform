@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { data: run } = await supabase.from('pipeline_runs').select('*, product_ideas(*)').eq('id', run_id).single()
+    const { data: run } = await supabase.from('pipeline_runs').select('*, product_ideas!pipeline_runs_product_idea_id_fkey(*)').eq('id', run_id).single()
     const [{ data: marketingPlan }, { data: leads }] = await Promise.all([
       supabase.from('marketing_plans').select('*').eq('run_id', run_id).single(),
       supabase.from('pipeline_leads').select('*').eq('run_id', run_id).order('kwaliteit_score', { ascending: false }).limit(15),

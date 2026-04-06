@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: run } = await supabase
     .from('pipeline_runs')
-    .select('*, product_ideas(*)')
+    .select('*, product_ideas!pipeline_runs_product_idea_id_fkey(*)')
     .eq('id', run_id)
     .single()
 

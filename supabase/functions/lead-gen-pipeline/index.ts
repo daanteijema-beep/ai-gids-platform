@@ -106,7 +106,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { data: run } = await supabase.from('pipeline_runs').select('*, product_ideas(*)').eq('id', run_id).single()
+    const { data: run } = await supabase.from('pipeline_runs').select('*, product_ideas!pipeline_runs_product_idea_id_fkey(*)').eq('id', run_id).single()
     const { data: marketingPlan } = await supabase.from('marketing_plans').select('*').eq('run_id', run_id).single()
 
     if (!run?.product_idea_id || !marketingPlan) {

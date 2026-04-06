@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
   const { data: run } = await supabaseAdmin
     .from('pipeline_runs')
-    .select('*, product_ideas(*)')
+    .select('*, product_ideas!pipeline_runs_product_idea_id_fkey(*)')
     .eq('id', run_id)
     .single()
 
