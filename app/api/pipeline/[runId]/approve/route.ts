@@ -34,12 +34,14 @@ export async function POST(
     if (!product_idea_id) return NextResponse.json({ error: 'product_idea_id vereist bij stap 1' }, { status: 400 })
 
     await supabaseAdmin.from('product_ideas').update({ geselecteerd: true }).eq('id', product_idea_id)
-    await supabaseAdmin.from('pipeline_runs').update({ product_idea_id, status: 'running' }).eq('id', runId)
+    // Verhoog huidige_stap zodat dashboard "Marketing agent bezig" toont, niet "Research"
+    await supabaseAdmin.from('pipeline_runs').update({ product_idea_id, status: 'running', huidige_stap: 2 }).eq('id', runId)
     await supabaseAdmin.from('pipeline_analytics').insert({
       run_id: runId, product_idea_id, event_type: 'idee_geselecteerd', stap: 1,
     })
   } else if (stap < 6) {
-    await supabaseAdmin.from('pipeline_runs').update({ status: 'running' }).eq('id', runId)
+    // Verhoog huidige_stap direct zodat het dashboard de juiste agent toont
+    await supabaseAdmin.from('pipeline_runs').update({ status: 'running', huidige_stap: stap + 1 }).eq('id', runId)
     await supabaseAdmin.from('pipeline_analytics').insert({
       run_id: runId, product_idea_id: run.product_idea_id, event_type: 'stap_goedgekeurd', stap,
     })

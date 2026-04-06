@@ -1,4 +1,4 @@
-export const maxDuration = 180
+export const maxDuration = 300
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -16,10 +16,23 @@ function strip(text: string) {
   return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
 }
 
+// ─── Timeout helper ───────────────────────────────────────────────────────────
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), ms)
+  })
+  try {
+    const result = await Promise.race([promise, timeout])
+    clearTimeout(timer!)
+    return result
+  } catch {
+    clearTimeout(timer!)
+    return fallback
+  }
+}
+
 // ─── Sociale media trends via Apify ───────────────────────────────────────────
-// Scrapet actuele trending posts op LinkedIn en Instagram/TikTok via Google Search.
-// Dit zorgt dat het marketing plan inspeelt op wat nu viraal gaat, niet op
-// generieke "best practices" — het plan wordt dus elke week anders.
 async function haalSocialeTrends(doelgroep: string, pijnpunt: string): Promise<string> {
   const token = process.env.APIFY_TOKEN
   if (!token) return ''
@@ -46,8 +59,8 @@ async function haalSocialeTrends(doelgroep: string, pijnpunt: string): Promise<s
       const runId = run?.data?.id
       if (!runId) continue
 
-      for (let i = 0; i < 4; i++) {
-        await new Promise(r => setTimeout(r, 8000))
+      for (let i = 0; i < 3; i++) {
+        await new Promise(r => setTimeout(r, 5000))
         const pd = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`).then(r => r.json())
         if (pd?.data?.status === 'SUCCEEDED') {
           const items = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${token}&limit=6`).then(r => r.json())
@@ -90,6 +103,13 @@ export async function POST(req: NextRequest) {
 
   const { run_id } = await req.json()
 
+  async function markeerFout(reden: string) {
+    await supabaseAdmin
+      .from('pipeline_runs')
+      .update({ status: 'afgewezen', afgewezen_reden: reden })
+      .eq('id', run_id)
+  }
+
   const { data: run } = await supabaseAdmin
     .from('pipeline_runs')
     .select('*, product_ideas(*)')
@@ -100,23 +120,20 @@ export async function POST(req: NextRequest) {
 
   const idee = run.product_ideas as Record<string, string>
 
-  // Log analytics
-  await supabaseAdmin.from('pipeline_analytics').insert({
-    run_id, product_idea_id: run.product_idea_id, event_type: 'stap_goedgekeurd', stap: 1,
-    metadata: { product_naam: idee.naam, product_type: idee.type },
-  })
+  try {
+    // Log analytics
+    await supabaseAdmin.from('pipeline_analytics').insert({
+      run_id, product_idea_id: run.product_idea_id, event_type: 'stap_gestart', stap: 2,
+      metadata: { product_naam: idee.naam, product_type: idee.type },
+    })
 
-  // Sociale trends + learnings parallel ophalen
-  const [socialeTrends, marketingLearnings] = await Promise.all([
-    haalSocialeTrends(idee.doelgroep, idee.pijnpunt),
-    haalMarketingLearnings(idee.type),
-  ])
+    // Sociale trends + learnings parallel ophalen — beide met timeout
+    const [socialeTrends, marketingLearnings] = await Promise.all([
+      withTimeout(haalSocialeTrends(idee.doelgroep, idee.pijnpunt), 25000, ''),
+      haalMarketingLearnings(idee.type),
+    ])
 
-  // Claude bouwt marketing blueprint met actuele trends ingebakken.
-  // ICP: zo specifiek dat je de persoon kunt tekenen.
-  // Email: pain→amplify→solution structuur, bewezen open rates.
-  // Social: platform-specifieke haak-formules gebaseerd op wat nu trending is.
-  const prompt = `Je bent een B2B marketing strateeg. Maak een volledig marketing plan voor dit AI-product.
+    const prompt = `Je bent een B2B marketing strateeg. Maak een volledig marketing plan voor dit AI-product.
 
 Product: ${idee.naam} — ${idee.tagline}
 Beschrijving: ${idee.beschrijving}
@@ -188,35 +205,46 @@ Geef JSON:
 }
 Alleen JSON.`
 
-  const msg = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 3000,
-    messages: [{ role: 'user', content: prompt }],
-  })
+    const msg = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 3000,
+      messages: [{ role: 'user', content: prompt }],
+    })
 
-  let plan: Record<string, unknown>
-  try {
-    plan = JSON.parse(strip((msg.content[0] as { text: string }).text))
-  } catch {
-    return NextResponse.json({ error: 'Ongeldige JSON' }, { status: 500 })
+    let plan: Record<string, unknown>
+    try {
+      plan = JSON.parse(strip((msg.content[0] as { text: string }).text))
+    } catch {
+      await markeerFout('Claude gaf geen geldige JSON terug')
+      return NextResponse.json({ error: 'Ongeldige JSON' }, { status: 500 })
+    }
+
+    const { error } = await supabaseAdmin.from('marketing_plans').insert({
+      run_id,
+      product_idea_id: run.product_idea_id,
+      icp: plan.icp,
+      email_strategie: plan.email_strategie,
+      social_plan: plan.social_plan,
+      key_messages: plan.key_messages,
+      zoekwoorden: plan.zoekwoorden,
+    })
+
+    if (error) {
+      await markeerFout(`DB insert mislukt: ${error.message}`)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    await supabaseAdmin
+      .from('pipeline_runs')
+      .update({ status: 'wacht_op_goedkeuring', huidige_stap: 2 })
+      .eq('id', run_id)
+
+    return NextResponse.json({ ok: true })
+
+  } catch (e) {
+    const reden = e instanceof Error ? e.message : String(e)
+    console.error('Marketing plan agent crash:', reden)
+    await markeerFout(`Agent crash: ${reden}`)
+    return NextResponse.json({ error: reden }, { status: 500 })
   }
-
-  const { error } = await supabaseAdmin.from('marketing_plans').insert({
-    run_id,
-    product_idea_id: run.product_idea_id,
-    icp: plan.icp,
-    email_strategie: plan.email_strategie,
-    social_plan: plan.social_plan,
-    key_messages: plan.key_messages,
-    zoekwoorden: plan.zoekwoorden,
-  })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  await supabaseAdmin
-    .from('pipeline_runs')
-    .update({ status: 'wacht_op_goedkeuring', huidige_stap: 2 })
-    .eq('id', run_id)
-
-  return NextResponse.json({ ok: true })
 }

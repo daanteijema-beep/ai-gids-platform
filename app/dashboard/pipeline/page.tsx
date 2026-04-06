@@ -378,53 +378,113 @@ export default function PipelinePage() {
 
 // ─── Stap componenten ──────────────────────────────────────────────────────────
 
+function BronLabel({ bron }: { bron: string }) {
+  const config: Record<string, { label: string; kleur: string }> = {
+    'google_trends': { label: 'Google Trends', kleur: 'bg-blue-50 text-blue-700 border-blue-200' },
+    'linkedin': { label: 'LinkedIn', kleur: 'bg-sky-50 text-sky-700 border-sky-200' },
+    'producthunt': { label: 'ProductHunt', kleur: 'bg-orange-50 text-orange-700 border-orange-200' },
+  }
+  const isReddit = bron.startsWith('reddit/')
+  if (isReddit) return <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-red-50 text-red-700 border-red-200">{bron.replace('reddit/', '')}</span>
+  const c = config[bron]
+  if (c) return <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${c.kleur}`}>{c.label}</span>
+  return <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-gray-50 text-gray-600 border-gray-200">{bron}</span>
+}
+
 function StapIdeeen({ ideeen, onKies, onAfwijzen, bezig }: {
   ideeen: Idee[]; onKies: (id: string) => void; onAfwijzen: () => void; bezig: boolean
 }) {
+  const [toonBronnen, setToonBronnen] = useState(false)
   const typeKleur: Record<string, string> = {
     mini_tool: 'bg-blue-50 text-blue-700 border-blue-200',
     agent: 'bg-purple-50 text-purple-700 border-purple-200',
     saas: 'bg-orange-50 text-orange-700 border-orange-200',
     website: 'bg-green-50 text-green-700 border-green-200',
   }
+
+  const eersteIdee = ideeen[0]
+  const bronnenGebruikt = (eersteIdee?.bronnen?.gebruikt as string[]) || []
+  const zoektermen = (eersteIdee?.bronnen?.zoektermen as string[]) || []
+
   return (
     <div>
       <h3 className="font-bold text-slate-900 mb-1">🔍 Stap 1 — Kies een product idee</h3>
-      <p className="text-sm text-slate-500 mb-4">De Research agent heeft 3 ideeën gevonden. Kies er één om mee verder te gaan.</p>
+      <p className="text-sm text-slate-500 mb-3">De Research agent heeft 3 ideeën gevonden. Kies er één om mee verder te gaan.</p>
+
+      {/* Databronnen samenvatting */}
+      {ideeen.length > 0 && (
+        <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <button
+            onClick={() => setToonBronnen(v => !v)}
+            className="flex items-center gap-2 w-full text-left"
+          >
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Databronnen gebruikt</span>
+            <div className="flex gap-1 flex-wrap">
+              {bronnenGebruikt.map(b => <BronLabel key={b} bron={b} />)}
+            </div>
+            <span className="ml-auto text-slate-400 text-xs">{toonBronnen ? '▲ inklappen' : '▼ details'}</span>
+          </button>
+          {toonBronnen && zoektermen.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-200">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Zoektermen Claude gebruikte</p>
+              <div className="flex flex-wrap gap-1.5">
+                {zoektermen.map((t, i) => (
+                  <span key={i} className="text-xs bg-white border border-slate-200 rounded-full px-2.5 py-1 text-slate-600 font-mono">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {!ideeen.length ? (
         <p className="text-slate-400 text-sm">Data wordt geladen...</p>
       ) : (
         <div className="grid md:grid-cols-3 gap-4 mb-4">
-          {ideeen.map(idee => (
-            <div key={idee.id} className="border border-slate-200 rounded-xl p-4 flex flex-col gap-3 hover:border-orange-300 transition">
-              <div className="flex items-start justify-between gap-2">
-                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${typeKleur[idee.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                  {idee.type}
-                </span>
-                <div className="flex items-center gap-1">
-                  <span className="text-yellow-400">★</span>
-                  <span className="text-xs font-bold text-slate-700">{idee.validatiescore}/10</span>
+          {ideeen.map(idee => {
+            const marktBewijs = idee.bronnen?.markt_bewijs as string | undefined
+            const onderscheidend = idee.bronnen?.onderscheidend as string | undefined
+            return (
+              <div key={idee.id} className="border border-slate-200 rounded-xl p-4 flex flex-col gap-3 hover:border-orange-300 transition">
+                <div className="flex items-start justify-between gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${typeKleur[idee.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                    {idee.type}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-yellow-400">★</span>
+                    <span className="text-xs font-bold text-slate-700">{idee.validatiescore}/10</span>
+                  </div>
                 </div>
+                <div>
+                  <p className="font-bold text-slate-900">{idee.naam}</p>
+                  <p className="text-sm text-slate-500 mt-0.5 italic">{idee.tagline}</p>
+                </div>
+                <p className="text-xs text-slate-600 flex-1">{idee.beschrijving}</p>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-500"><span className="font-medium">Doelgroep:</span> {idee.doelgroep}</p>
+                  <p className="text-xs text-slate-500"><span className="font-medium">Pijnpunt:</span> {idee.pijnpunt}</p>
+                  <p className="text-xs font-bold text-orange-600">{idee.prijsindicatie}</p>
+                </div>
+                {marktBewijs && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-2">
+                    <p className="text-xs text-blue-700"><span className="font-semibold">Bewijs:</span> {marktBewijs}</p>
+                  </div>
+                )}
+                {onderscheidend && (
+                  <div className="bg-green-50 border border-green-100 rounded-lg px-2.5 py-2">
+                    <p className="text-xs text-green-700"><span className="font-semibold">vs ChatGPT:</span> {onderscheidend}</p>
+                  </div>
+                )}
+                <button
+                  onClick={() => onKies(idee.id)}
+                  disabled={bezig}
+                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm transition"
+                >
+                  Kies dit idee →
+                </button>
               </div>
-              <div>
-                <p className="font-bold text-slate-900">{idee.naam}</p>
-                <p className="text-sm text-slate-500 mt-0.5 italic">{idee.tagline}</p>
-              </div>
-              <p className="text-xs text-slate-600 flex-1">{idee.beschrijving}</p>
-              <div className="space-y-1">
-                <p className="text-xs text-slate-500"><span className="font-medium">Doelgroep:</span> {idee.doelgroep}</p>
-                <p className="text-xs text-slate-500"><span className="font-medium">Pijnpunt:</span> {idee.pijnpunt}</p>
-                <p className="text-xs font-bold text-orange-600">{idee.prijsindicatie}</p>
-              </div>
-              <button
-                onClick={() => onKies(idee.id)}
-                disabled={bezig}
-                className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm transition"
-              >
-                Kies dit idee →
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
       <button onClick={onAfwijzen} className="text-sm text-red-500 hover:text-red-700">Alle ideeën afwijzen</button>

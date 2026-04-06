@@ -46,13 +46,17 @@ async function bepaalZoektermen(learnings: string): Promise<string[]> {
     max_tokens: 400,
     messages: [{
       role: 'user',
-      content: `Je bent een marktonderzoeker. Geef 5 verschillende zoektermen voor Reddit/LinkedIn
-om AI-tool kansen voor kleine ondernemers te vinden. Elke term moet een andere invalshoek pakken
-(bijv. pijnpunt, sector, taak, tijdsverspilling).
+      content: `Je bent een marktonderzoeker. Geef 5 zoektermen voor Reddit/LinkedIn
+om AI-tool kansen voor kleine ondernemers in Nederland te vinden.
+
+REGELS:
+- Elke term pakt een ANDERE sector (bouw, zorg, horeca, transport, detailhandel, creatief, etc.)
+- Geen twee termen over dezelfde branche
+- Mix: pijnpunten, taken, sectoren, functies
 
 ${learnings}
 
-Geef JSON array van 5 strings. Alleen JSON.`,
+Geef JSON array van 5 strings (Engelstalig voor Reddit, kort en specifiek). Alleen JSON.`,
     }],
   })
   try {
@@ -191,9 +195,13 @@ ${learnings}
 
 Gebruikte zoektermen deze run: ${zoektermen.join(', ')}
 
-Analyseer de marktdata en genereer 3 concrete productideeën voor AI-tools/agents/mini-SaaS.
-Elk idee moet: een echte tijdrovende taak automatiseren, als indie-product lanseerbaar zijn,
-specifiek zijn (geen vage AI-assistent maar een gerichte tool).
+Analyseer de marktdata en genereer 3 concrete productideeën. KRITISCH: de 3 ideeën MOETEN van elkaar verschillen:
+- Idee 1: voor een ANDERE sector/branche dan idee 2 en 3
+- Idee 2: een ANDER type taak automatiseren dan idee 1 en 3
+- Idee 3: een ANDERE doelgroep (niet dezelfde als 1 of 2)
+
+Elk idee automatiseert een concrete, tijdrovende, repetitieve taak. Geen vage "AI-assistent".
+Gebaseerd op de pijnpunten uit de marktdata hieronder.
 
 Marktdata:
 ${context.slice(0, 6000)}
@@ -201,16 +209,16 @@ ${context.slice(0, 6000)}
 JSON array met precies 3 ideeën:
 [
   {
-    "naam": "productnaam (max 4 woorden)",
-    "tagline": "wat het doet in 6 woorden",
-    "beschrijving": "2-3 zinnen: wat, hoe, voor wie",
-    "doelgroep": "specifieke functie/sector",
-    "pijnpunt": "concreet probleem, niet vaag",
+    "naam": "productnaam (max 4 woorden, Nederlands of Engels)",
+    "tagline": "wat het PRECIES doet in 6 woorden",
+    "beschrijving": "2-3 zinnen: welke specifieke handeling wordt geautomatiseerd, hoe werkt het in de praktijk, voor wie exact",
+    "doelgroep": "SPECIFIEK: bijv. 'zelfstandig loodgieter 30-55 jaar' niet 'MKB'",
+    "pijnpunt": "CONCREET: bijv. 'elke vrijdag 2 uur kwijt aan offertes schrijven' niet 'tijdgebrek'",
     "type": "mini_tool|agent|website|saas",
     "prijsindicatie": "€X/maand of €X eenmalig",
     "validatiescore": 1-10,
-    "markt_bewijs": "1 zin: welke data-bron dit onderbouwt",
-    "onderscheidend": "wat dit anders maakt dan ChatGPT/Notion"
+    "markt_bewijs": "citeer LETTERLIJK een fragment uit de marktdata die dit onderbouwt",
+    "onderscheidend": "wat dit anders maakt dan gewoon ChatGPT gebruiken"
   }
 ]
 Alleen JSON.`
