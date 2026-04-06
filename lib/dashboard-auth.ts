@@ -6,7 +6,7 @@ const DASHBOARD_COOKIE_NAME = 'vakwebtwente_dashboard_session'
 const DASHBOARD_SESSION_NAMESPACE = 'vakwebtwente-dashboard-session'
 
 function getDashboardPassword(): string {
-  return process.env.DASHBOARD_PASSWORD || process.env.NEXT_PUBLIC_DASHBOARD_PASSWORD || ''
+  return process.env.DASHBOARD_PASSWORD || ''
 }
 
 function getDashboardSessionSecret(): string {
