@@ -8,6 +8,7 @@ type Agent = {
   naam: string
   beschrijving: string
   details: string[]
+  skills: { naam: string; kleur: string }[]
   badge: string
   badgeColor: string
 }
@@ -19,6 +20,12 @@ const PIPELINE_AGENTS: Agent[] = [
     naam: 'Research Ideas',
     beschrijving: 'Zoekt actuele AI-tool ideeën voor kleine ondernemers op basis van live marktdata.',
     details: ['Reddit trends', 'ProductHunt scraping', 'Google Trends (Apify)', 'LinkedIn posts'],
+    skills: [
+      { naam: 'Reddit API', kleur: 'bg-red-50 text-red-600 border-red-100' },
+      { naam: 'Firecrawl', kleur: 'bg-orange-50 text-orange-600 border-orange-100' },
+      { naam: 'Apify', kleur: 'bg-yellow-50 text-yellow-700 border-yellow-100' },
+      { naam: 'Claude', kleur: 'bg-violet-50 text-violet-600 border-violet-100' },
+    ],
     badge: 'Stap 1',
     badgeColor: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   },
@@ -27,7 +34,13 @@ const PIPELINE_AGENTS: Agent[] = [
     id: 'marketing-plan',
     naam: 'Marketing Plan',
     beschrijving: 'Bouwt een volledig marketing blueprint: ICP, email sequentie en social strategie.',
-    details: ['Ideaal klantprofiel (ICP)', '3-delige email sequentie', 'LinkedIn + Meta + Instagram plan', 'Zoekwoord strategie'],
+    details: ['Ideaal klantprofiel (ICP)', '3-delige email sequentie', 'LinkedIn + Meta + Instagram plan', 'Positionering + zoekwoorden'],
+    skills: [
+      { naam: 'cmo-advisor', kleur: 'bg-purple-50 text-purple-600 border-purple-100' },
+      { naam: 'email-marketing', kleur: 'bg-blue-50 text-blue-600 border-blue-100' },
+      { naam: 'meta-ads', kleur: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+      { naam: 'marketing-demand-acquisition', kleur: 'bg-teal-50 text-teal-600 border-teal-100' },
+    ],
     badge: 'Stap 2',
     badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
   },
@@ -37,6 +50,11 @@ const PIPELINE_AGENTS: Agent[] = [
     naam: 'Landing Page Agent',
     beschrijving: 'Schrijft volledige SEO-copy en maakt automatisch een Stripe product + prijs aan.',
     details: ['Hero headline + subline', '3 features + 5 voordelen', 'FAQ + sociaal bewijs', 'Stripe product aanmaken'],
+    skills: [
+      { naam: '30x-seo-content-writer', kleur: 'bg-green-50 text-green-600 border-green-100' },
+      { naam: 'Stripe API', kleur: 'bg-violet-50 text-violet-600 border-violet-100' },
+      { naam: 'Claude', kleur: 'bg-violet-50 text-violet-600 border-violet-100' },
+    ],
     badge: 'Stap 3',
     badgeColor: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
   },
@@ -46,6 +64,12 @@ const PIPELINE_AGENTS: Agent[] = [
     naam: 'Content Creator',
     beschrijving: 'Genereert 3 kant-en-klare social posts (LinkedIn, Meta, Instagram) met stockfoto\'s.',
     details: ['LinkedIn post (150-250 woorden)', 'Meta advertentie tekst', 'Instagram post + hashtags', 'Pexels stockfoto per platform'],
+    skills: [
+      { naam: 'meta-ads', kleur: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+      { naam: 'Pexels API', kleur: 'bg-green-50 text-green-600 border-green-100' },
+      { naam: 'Cloudinary', kleur: 'bg-blue-50 text-blue-600 border-blue-100' },
+      { naam: 'Claude', kleur: 'bg-violet-50 text-violet-600 border-violet-100' },
+    ],
     badge: 'Stap 4',
     badgeColor: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
   },
@@ -55,6 +79,10 @@ const PIPELINE_AGENTS: Agent[] = [
     naam: 'Lead Gen Pipeline',
     beschrijving: 'Vindt 10–30 bedrijven via Google Maps die passen bij het ideaal klantprofiel.',
     details: ['Google Maps scraping (Apify)', 'ICP-matching score 1-10', 'Deduplicatie', 'Kwaliteitsranking'],
+    skills: [
+      { naam: 'Apify Google Maps', kleur: 'bg-yellow-50 text-yellow-700 border-yellow-100' },
+      { naam: 'Claude', kleur: 'bg-violet-50 text-violet-600 border-violet-100' },
+    ],
     badge: 'Stap 5',
     badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   },
@@ -63,7 +91,12 @@ const PIPELINE_AGENTS: Agent[] = [
     id: 'outreach-writer',
     naam: 'Outreach Writer',
     beschrijving: 'Schrijft gepersonaliseerde cold emails per lead op basis van sector, naam en pijnpunt.',
-    details: ['Gepersonaliseerde aanhef', 'Pain hook (dag 1 structuur)', 'Bedrijfsspecifieke copy', 'Klaar voor verzending'],
+    details: ['Gepersonaliseerde aanhef', 'Pain hook → amplify → oplossing', 'Bedrijfsspecifieke copy', 'Klaar voor verzending via Resend'],
+    skills: [
+      { naam: 'email-marketing', kleur: 'bg-blue-50 text-blue-600 border-blue-100' },
+      { naam: 'Claude', kleur: 'bg-violet-50 text-violet-600 border-violet-100' },
+      { naam: 'Resend', kleur: 'bg-slate-50 text-slate-600 border-slate-200' },
+    ],
     badge: 'Stap 6',
     badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
   },
@@ -139,13 +172,25 @@ export default function AgentsPage() {
               <p className="text-slate-500 text-[13px] leading-relaxed mb-4">{agent.beschrijving}</p>
 
               {/* Details */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 mb-4">
                 {agent.details.map((detail) => (
                   <div key={detail} className="flex items-center gap-2 text-[12px] text-slate-400">
                     <span className="w-1 h-1 bg-orange-400 rounded-full shrink-0" />
                     {detail}
                   </div>
                 ))}
+              </div>
+
+              {/* Skills / APIs */}
+              <div>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Skills & APIs</p>
+                <div className="flex flex-wrap gap-1">
+                  {agent.skills.map((skill) => (
+                    <span key={skill.naam} className={`text-[10px] font-medium px-2 py-0.5 rounded border ${skill.kleur}`}>
+                      {skill.naam}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 
