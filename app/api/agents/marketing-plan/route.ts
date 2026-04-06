@@ -32,54 +32,52 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
   }
 }
 
-// ─── Sociale media trends via Apify ───────────────────────────────────────────
+// ─── Één Apify Google Search query ────────────────────────────────────────────
+async function apifyGoogleSearch(token: string, query: string): Promise<string> {
+  try {
+    const startRes = await fetch(
+      `https://api.apify.com/v2/acts/apify~google-search-scraper/runs?token=${token}&memory=256`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queries: query, resultsPerPage: 5, maxPagesPerQuery: 1, languageCode: 'nl' }),
+      }
+    )
+    if (!startRes.ok) return ''
+    const run = await startRes.json()
+    const runId = run?.data?.id
+    if (!runId) return ''
+
+    for (let i = 0; i < 2; i++) {
+      await new Promise(r => setTimeout(r, 4000))
+      const pd = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`).then(r => r.json())
+      if (pd?.data?.status === 'SUCCEEDED') {
+        const items = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${token}&limit=5`).then(r => r.json())
+        if (Array.isArray(items)) {
+          return (items as Array<{ title?: string; snippet?: string }>)
+            .slice(0, 3).map(r => `${r.title}: ${r.snippet}`).join('\n')
+        }
+      }
+      if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(pd?.data?.status)) break
+    }
+  } catch { /* skip */ }
+  return ''
+}
+
+// ─── Sociale media trends via Apify — parallel ────────────────────────────────
 async function haalSocialeTrends(doelgroep: string, pijnpunt: string): Promise<string> {
   const token = process.env.APIFY_TOKEN
   if (!token) return ''
 
-  const queries = [
-    `site:linkedin.com/posts "${doelgroep}" AI OR automatisering 2026`,
-    `site:instagram.com "${pijnpunt}" ondernemer viral`,
-  ]
+  // Beide queries parallel — elk max 2×4s = 8s wacht + overhead
+  const [linkedin, instagram] = await Promise.all([
+    apifyGoogleSearch(token, `site:linkedin.com/posts "${doelgroep}" AI automatisering 2026`),
+    apifyGoogleSearch(token, `"${pijnpunt}" ondernemer Nederland`),
+  ])
 
-  const resultaten: string[] = []
-
-  for (const query of queries) {
-    try {
-      const startRes = await fetch(
-        `https://api.apify.com/v2/acts/apify~google-search-scraper/runs?token=${token}&memory=256`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ queries: query, resultsPerPage: 6, maxPagesPerQuery: 1, languageCode: 'nl' }),
-        }
-      )
-      if (!startRes.ok) continue
-      const run = await startRes.json()
-      const runId = run?.data?.id
-      if (!runId) continue
-
-      for (let i = 0; i < 3; i++) {
-        await new Promise(r => setTimeout(r, 5000))
-        const pd = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`).then(r => r.json())
-        if (pd?.data?.status === 'SUCCEEDED') {
-          const items = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${token}&limit=6`).then(r => r.json())
-          if (Array.isArray(items)) {
-            const snippets = (items as Array<{ title?: string; snippet?: string }>)
-              .slice(0, 4)
-              .map(r => `${r.title}: ${r.snippet}`)
-              .join('\n')
-            resultaten.push(snippets)
-          }
-          break
-        }
-        if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(pd?.data?.status)) break
-      }
-    } catch { continue }
-  }
-
+  const resultaten = [linkedin, instagram].filter(Boolean)
   return resultaten.length
-    ? `\nACTUELE SOCIALE MEDIA TRENDS (gebruik voor haak-formules en post-tijdstip):\n${resultaten.join('\n---\n')}`
+    ? `\nACTUELE TRENDS (gebruik voor haak-formules):\n${resultaten.join('\n---\n')}`
     : ''
 }
 
