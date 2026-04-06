@@ -1,4 +1,4 @@
-export const maxDuration = 300
+export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -16,72 +16,6 @@ function strip(text: string) {
   return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
 }
 
-// ─── Timeout helper ───────────────────────────────────────────────────────────
-async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>
-  const timeout = new Promise<T>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('timeout')), ms)
-  })
-  try {
-    const result = await Promise.race([promise, timeout])
-    clearTimeout(timer!)
-    return result
-  } catch {
-    clearTimeout(timer!)
-    return fallback
-  }
-}
-
-// ─── Één Apify Google Search query ────────────────────────────────────────────
-async function apifyGoogleSearch(token: string, query: string): Promise<string> {
-  try {
-    const startRes = await fetch(
-      `https://api.apify.com/v2/acts/apify~google-search-scraper/runs?token=${token}&memory=256`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queries: query, resultsPerPage: 5, maxPagesPerQuery: 1, languageCode: 'nl' }),
-      }
-    )
-    if (!startRes.ok) return ''
-    const run = await startRes.json()
-    const runId = run?.data?.id
-    if (!runId) return ''
-
-    for (let i = 0; i < 2; i++) {
-      await new Promise(r => setTimeout(r, 4000))
-      const pd = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`).then(r => r.json())
-      if (pd?.data?.status === 'SUCCEEDED') {
-        const items = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${token}&limit=5`).then(r => r.json())
-        if (Array.isArray(items)) {
-          return (items as Array<{ title?: string; snippet?: string }>)
-            .slice(0, 3).map(r => `${r.title}: ${r.snippet}`).join('\n')
-        }
-      }
-      if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(pd?.data?.status)) break
-    }
-  } catch { /* skip */ }
-  return ''
-}
-
-// ─── Sociale media trends via Apify — parallel ────────────────────────────────
-async function haalSocialeTrends(doelgroep: string, pijnpunt: string): Promise<string> {
-  const token = process.env.APIFY_TOKEN
-  if (!token) return ''
-
-  // Beide queries parallel — elk max 2×4s = 8s wacht + overhead
-  const [linkedin, instagram] = await Promise.all([
-    apifyGoogleSearch(token, `site:linkedin.com/posts "${doelgroep}" AI automatisering 2026`),
-    apifyGoogleSearch(token, `"${pijnpunt}" ondernemer Nederland`),
-  ])
-
-  const resultaten = [linkedin, instagram].filter(Boolean)
-  return resultaten.length
-    ? `\nACTUELE TRENDS (gebruik voor haak-formules):\n${resultaten.join('\n---\n')}`
-    : ''
-}
-
-// ─── Campaign learnings voor marketing ────────────────────────────────────────
 async function haalMarketingLearnings(productType: string): Promise<string> {
   const { data } = await supabaseAdmin
     .from('campaign_learnings')
@@ -119,19 +53,14 @@ export async function POST(req: NextRequest) {
   const idee = run.product_ideas as Record<string, string>
 
   try {
-    // Log analytics
     await supabaseAdmin.from('pipeline_analytics').insert({
       run_id, product_idea_id: run.product_idea_id, event_type: 'stap_gestart', stap: 2,
       metadata: { product_naam: idee.naam, product_type: idee.type },
     })
 
-    // Sociale trends + learnings parallel ophalen — beide met timeout
-    const [socialeTrends, marketingLearnings] = await Promise.all([
-      withTimeout(haalSocialeTrends(idee.doelgroep, idee.pijnpunt), 25000, ''),
-      haalMarketingLearnings(idee.type),
-    ])
+    const marketingLearnings = await haalMarketingLearnings(idee.type)
 
-    const prompt = `Je bent een B2B marketing strateeg. Maak een volledig marketing plan voor dit AI-product.
+    const prompt = `Je bent een B2B marketing strateeg. Maak een volledig marketing plan voor dit AI-product voor de Nederlandse markt.
 
 Product: ${idee.naam} — ${idee.tagline}
 Beschrijving: ${idee.beschrijving}
@@ -139,7 +68,6 @@ Doelgroep: ${idee.doelgroep}
 Pijnpunt: ${idee.pijnpunt}
 Type: ${idee.type}
 Prijs: ${idee.prijsindicatie}
-${socialeTrends}
 ${marketingLearnings}
 
 Geef JSON:
@@ -171,8 +99,7 @@ Geef JSON:
       "post_types": ["educatief", "pijnpunt", "bewijs", "behind-scenes"],
       "frequentie": "X per week",
       "beste_tijdstip": "dag hh:mm",
-      "haak_formule": "concrete openingszin structuur gebaseerd op actuele trends",
-      "trending_themas": ["thema uit social trends data"]
+      "haak_formule": "concrete openingszin structuur"
     },
     "meta": {
       "campagne_doel": "awareness/leads/conversie",
@@ -205,7 +132,7 @@ Alleen JSON.`
 
     const msg = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 3000,
+      max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     })
 
