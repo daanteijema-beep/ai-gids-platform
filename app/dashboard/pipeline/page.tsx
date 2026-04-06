@@ -89,14 +89,6 @@ export default function PipelinePage() {
     return () => clearInterval(t)
   }, [runs, laadRuns])
 
-  async function triggerAgent(agentId: string, runId: string) {
-    await fetch('/api/agents/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentId, run_id: runId }),
-    })
-  }
-
   async function startRun() {
     setBezig(true)
     setShowPrompt(false)
@@ -106,11 +98,11 @@ export default function PipelinePage() {
       body: JSON.stringify({ notitie: gebruikerPrompt.trim() || undefined }),
     })
     if (res.ok) {
-      const { run_id, next_agent } = await res.json()
+      const { run_id } = await res.json()
       setActieveRun(run_id)
       setGebruikerPrompt('')
       await laadRuns()
-      if (next_agent) triggerAgent(next_agent, run_id)
+      // Orchestrator is al getriggerd vanuit de server — geen extra call nodig
     }
     setBezig(false)
   }
@@ -157,11 +149,7 @@ export default function PipelinePage() {
     setStap2Data(d => { const n = { ...d }; delete n[runId]; return n })
     await laadRuns()
     setBezig(false)
-    // Trigger volgende agent direct vanuit de browser
-    if (res.ok) {
-      const { next_agent } = await res.json().catch(() => ({}))
-      if (next_agent) triggerAgent(next_agent, runId)
-    }
+    // Orchestrator is al getriggerd vanuit de approve route — geen extra call nodig
   }
 
   async function keurAf(runId: string) {

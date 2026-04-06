@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-const VOLGENDE_AGENT: Record<number, string> = {
-  1: 'marketing-plan',
-  2: 'landing-page-agent',
-  3: 'content-creator',
-  4: 'lead-gen-pipeline',
-  5: 'outreach-writer',
-}
+const ORCHESTRATOR_URL = 'https://knagzemkqtjuenlmkeff.supabase.co/functions/v1/orchestrator'
 
 export async function POST(
   req: NextRequest,
@@ -79,7 +73,14 @@ export async function POST(
     return NextResponse.json({ ok: true, status: 'voltooid', next_agent: null })
   }
 
-  // Geef next_agent terug — dashboard triggert de agent zelf via /api/agents/run
-  const next_agent = VOLGENDE_AGENT[stap] || null
-  return NextResponse.json({ ok: true, stap_goedgekeurd: stap, next_agent })
+  // Trigger de orchestrator — die bepaalt welke agent als volgende draait.
+  // Fire-and-forget: niet wachten op response, Vercel zou timeouten.
+  const secret = process.env.CRON_SECRET || ''
+  fetch(ORCHESTRATOR_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+    body: JSON.stringify({ run_id: runId }),
+  }).catch(err => console.error('Orchestrator trigger fout:', err))
+
+  return NextResponse.json({ ok: true, stap_goedgekeurd: stap })
 }

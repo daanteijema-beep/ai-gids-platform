@@ -30,21 +30,17 @@ export async function POST(req: NextRequest) {
   if (niche_id) payload.niche_id = niche_id
   if (run_id) payload.run_id = run_id
 
-  // Zware agents draaien via Supabase Edge Functions (geen 60s limiet)
+  // Supabase agents: fire-and-forget — NIET wachten op response.
+  // Vercel Hobby zou timeouten (60s) als we wachten op een 2-minuten Supabase job.
+  // De Supabase function update pipeline_runs direct als die klaar is.
   if (SUPABASE_AGENTS[agentId]) {
-    const res = await fetch(SUPABASE_AGENTS[agentId], {
+    fetch(SUPABASE_AGENTS[agentId], {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
       body: JSON.stringify(payload),
-    })
-    const text = await res.text()
-    let data: unknown
-    try { data = JSON.parse(text) }
-    catch {
-      console.error(`Supabase agent ${agentId} gaf geen JSON (status ${res.status}):`, text.slice(0, 200))
-      return NextResponse.json({ error: `Agent ${agentId} gaf geen geldige response`, raw: text.slice(0, 200) }, { status: 502 })
-    }
-    return NextResponse.json(data, { status: res.status })
+    }).catch(err => console.error(`Supabase agent ${agentId} fout:`, err))
+
+    return NextResponse.json({ ok: true, queued: true, agent: agentId })
   }
 
   const agent = AGENTS[agentId]
