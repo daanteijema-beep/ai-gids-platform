@@ -9,7 +9,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 function isAuthorized(req: NextRequest) {
   const secret = req.headers.get('x-cron-secret') || req.nextUrl.searchParams.get('secret') || ''
   const auth = req.headers.get('authorization')?.replace('Bearer ', '') || ''
-  return secret === process.env.CRON_SECRET || auth === process.env.CRON_SECRET || auth === 'dev'
+  return secret === process.env.CRON_SECRET || auth === process.env.CRON_SECRET
 }
 
 function getWeek(): string {
