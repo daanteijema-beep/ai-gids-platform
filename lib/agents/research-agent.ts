@@ -1,6 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { supabaseAdmin, AgentLearning } from '../supabase'
-import { generatePdfContent } from './subagents/pdf-content-generator'
 
 const client = new Anthropic()
 
@@ -142,7 +141,6 @@ Antwoord in dit JSON formaat:
   }
 
   const insertedIds: string[] = []
-  const insertedIdeas: Array<{ id: string; idea: any }> = []
 
   for (const idea of parsed.ideas) {
     const { data, error } = await supabaseAdmin
@@ -164,30 +162,6 @@ Antwoord in dit JSON formaat:
 
     if (error) throw error
     insertedIds.push(data.id)
-    insertedIdeas.push({ id: data.id, idea })
-  }
-
-  // Generate PDF draft for the best idea only (highest confidence score)
-  const best = insertedIdeas.sort(
-    (a, b) => (b.idea.agent_confidence_score || 0) - (a.idea.agent_confidence_score || 0)
-  )[0]
-
-  if (best) {
-    try {
-      const { html } = await generatePdfContent({
-        title: best.idea.title,
-        subtitle: best.idea.subtitle,
-        niche: best.idea.niche,
-        doelgroep: best.idea.target_audience,
-        probleem: best.idea.problem_solved,
-      })
-      await supabaseAdmin
-        .from('pdf_ideas')
-        .update({ draft_pdf_html: html })
-        .eq('id', best.id)
-    } catch (err) {
-      console.error('Draft PDF generation failed for best idea:', err)
-    }
   }
 
   return { count: insertedIds.length, ids: insertedIds, researchSummary: parsed.research_summary }
