@@ -149,11 +149,13 @@ Antwoord in dit JSON formaat:
   }
 
   if (parsed.research_summary) {
-    await supabaseAdmin.from('agent_learnings').insert({
-      learning_type: 'general',
-      insight: `[Research run] ${parsed.research_summary}`,
-      data_points: { source: 'web_research', timestamp: new Date().toISOString() },
-    }).catch(() => {}) // non-fatal
+    try {
+      await supabaseAdmin.from('agent_learnings').insert({
+        learning_type: 'general',
+        insight: `[Research run] ${parsed.research_summary}`,
+        data_points: { source: 'web_research', timestamp: new Date().toISOString() },
+      })
+    } catch { /* non-fatal */ }
   }
 
   const insertedIds: string[] = []
