@@ -125,9 +125,17 @@ export default function PdfDashboardClient({ data }: { data: any }) {
             </div>
             <h1 className="text-2xl font-bold text-gray-900">{pdf.title}</h1>
             <p className="text-gray-500 text-sm mt-1">{pdf.subtitle}</p>
-            <a href={`${appUrl}/${pdf.slug}`} target="_blank" className="text-sm text-indigo-600 hover:underline font-medium mt-2 inline-block">
-              🌐 {appUrl}/{pdf.slug} →
-            </a>
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <a href={`${appUrl}/${pdf.slug}`} target="_blank" className="text-sm text-indigo-600 hover:underline font-medium">
+                🌐 {appUrl}/{pdf.slug} →
+              </a>
+              {pdf.generated_pdf_html && (
+                <a href={`/dashboard/pdfs/${pdf.id}/preview`} target="_blank"
+                  className="text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium px-3 py-1 rounded-lg transition">
+                  📄 Bekijk PDF →
+                </a>
+              )}
+            </div>
           </div>
           <div className="text-right flex-shrink-0">
             <p className="text-3xl font-bold text-indigo-600">€{pdf.price}</p>
