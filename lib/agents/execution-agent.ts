@@ -80,7 +80,7 @@ Antwoord ALLEEN in dit JSON formaat:
 
   const landingContent = landingResponse.content[0]
   if (landingContent.type !== 'text') throw new Error('Bad landing response')
-  const landingData = JSON.parse(landingContent.text)
+  const landingData = JSON.parse(landingContent.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim())
 
   await supabaseAdmin.from('landing_pages').insert({
     pdf_id: pdf.id,
@@ -123,7 +123,7 @@ Antwoord ALLEEN in dit JSON formaat:
 
   const socialContent = socialResponse.content[0]
   if (socialContent.type !== 'text') throw new Error('Bad social response')
-  const socialData = JSON.parse(socialContent.text)
+  const socialData = JSON.parse(socialContent.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim())
 
   const now = new Date()
   for (const post of socialData.posts) {

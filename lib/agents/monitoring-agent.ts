@@ -87,7 +87,7 @@ Learning types: niche_performance, price_sensitivity, platform_roi, general`,
 
   const learningsContent = learningsResponse.content[0]
   if (learningsContent.type !== 'text') throw new Error('Bad learnings response')
-  const learningsData = JSON.parse(learningsContent.text)
+  const learningsData = JSON.parse(learningsContent.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim())
 
   for (const learning of learningsData.learnings) {
     await supabaseAdmin.from('agent_learnings').insert({

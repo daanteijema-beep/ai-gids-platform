@@ -91,7 +91,8 @@ Antwoord ALLEEN in dit JSON formaat, geen extra tekst:
   const content = response.content[0]
   if (content.type !== 'text') throw new Error('Unexpected response type')
 
-  const parsed = JSON.parse(content.text)
+  const raw = content.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+  const parsed = JSON.parse(raw)
 
   const insertedIds: string[] = []
   for (const idea of parsed.ideas) {
