@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runLeadFollowup, runCrossSell } from '@/lib/agents/outreach-agent'
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const secret = req.headers.get('x-cron-secret') || req.nextUrl.searchParams.get('secret')
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -13,3 +13,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const GET = handler
+export const POST = handler

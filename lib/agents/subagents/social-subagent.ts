@@ -11,10 +11,33 @@ function stripJson(text: string) {
   return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
 }
 
-// ─── Meta (Instagram) auto-post via Graph API ───────────────────────────────
-async function postToInstagram(caption: string, imageUrl?: string): Promise<string | null> {
+// Load Meta config from Supabase (set by OAuth callback) or fall back to env
+async function getMetaConfig(): Promise<{ token: string; igAccountId: string } | null> {
+  const { data } = await supabaseAdmin
+    .from('agent_learnings')
+    .select('data_points')
+    .eq('insight', '__META_CONFIG__')
+    .single()
+
+  if (data?.data_points) {
+    const cfg = data.data_points as Record<string, string>
+    if (cfg.meta_page_token && cfg.meta_ig_account_id) {
+      return { token: cfg.meta_page_token, igAccountId: cfg.meta_ig_account_id }
+    }
+  }
+
+  // Fall back to env vars
   const token = process.env.META_ACCESS_TOKEN
   const igAccountId = process.env.META_IG_ACCOUNT_ID
+  if (token && igAccountId) return { token, igAccountId }
+  return null
+}
+
+// ─── Meta (Instagram) auto-post via Graph API ───────────────────────────────
+async function postToInstagram(caption: string, imageUrl?: string): Promise<string | null> {
+  const config = await getMetaConfig()
+  if (!config) return null
+  const { token, igAccountId } = config
   if (!token || !igAccountId) return null
 
   try {
