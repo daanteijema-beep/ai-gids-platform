@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 const PLATFORM_ICON: Record<string, string> = { instagram: '📸', linkedin: '💼', tiktok: '🎵' }
 const TYPE_COLOR: Record<string, string> = {
@@ -18,16 +19,64 @@ type Lead = { id: string; email: string; name: string | null; created_at: string
 type Order = { id: string; customer_name: string; customer_email: string; status: string; created_at: string }
 type EmailSeq = { trigger: string; subject: string; delay_hours: number }
 
+type StepKey = 'pdf' | 'social' | 'images' | 'mail' | 'leads'
+type StepStatus = 'idle' | 'loading' | 'done' | 'error'
+
+const STEPS: { key: StepKey; label: string; icon: string; description: string }[] = [
+  { key: 'pdf', label: 'PDF genereren', icon: '📄', description: 'Schrijft de volledige gids (~45s)' },
+  { key: 'images', label: 'Afbeeldingen', icon: '🖼️', description: 'Hero, cover + Instagram posts' },
+  { key: 'social', label: 'Social content', icon: '📱', description: '6 posts voor Instagram & Facebook' },
+  { key: 'mail', label: 'Email sequenties', icon: '📧', description: '4 emails klaar voor leads' },
+  { key: 'leads', label: 'Leads zoeken', icon: '🎯', description: 'Communities + outreach scripts (~2min)' },
+]
+
 export default function PdfDashboardClient({ data }: { data: any }) {
   const { pdf, landing, template, posts, leads, orders, emailSequences, outreachData } = data
-  const [activeTab, setActiveTab] = useState<'overview' | 'images' | 'social' | 'template' | 'leads' | 'emails'>('overview')
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'overview' | 'actions' | 'images' | 'social' | 'template' | 'leads' | 'emails'>('overview')
   const [socialPlatform, setSocialPlatform] = useState<'instagram' | 'linkedin' | 'tiktok'>('instagram')
   const [publishingId, setPublishingId] = useState<string | null>(null)
   const [publishedIds, setPublishedIds] = useState<Set<string>>(new Set())
+  const [stepStatus, setStepStatus] = useState<Record<StepKey, StepStatus>>({
+    pdf: 'idle', social: 'idle', images: 'idle', mail: 'idle', leads: 'idle',
+  })
+  const [stepResult, setStepResult] = useState<Record<StepKey, string>>({
+    pdf: '', social: '', images: '', mail: '', leads: '',
+  })
 
   const revenue = orders.filter((o: Order) => ['paid', 'generated', 'delivered'].includes(o.status)).length * pdf.price
   const appUrl = 'https://vakwebtwente.vercel.app'
   const images = pdf.images || {}
+
+  const runStep = async (step: StepKey) => {
+    setStepStatus(s => ({ ...s, [step]: 'loading' }))
+    setStepResult(s => ({ ...s, [step]: '' }))
+    try {
+      const res = await fetch(`/api/agents/step/${step}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdfId: pdf.id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setStepStatus(s => ({ ...s, [step]: 'done' }))
+        const summary = step === 'pdf' ? `${data.chapters} hoofdstukken` :
+          step === 'social' ? `${data.postsCreated} posts` :
+          step === 'images' ? `${data.imagesGenerated} afbeeldingen` :
+          step === 'mail' ? `${data.emailsGenerated} emails` :
+          step === 'leads' ? `${data.communitiesFound} communities` : 'Klaar'
+        setStepResult(s => ({ ...s, [step]: summary }))
+        // Refresh page data after 2s
+        setTimeout(() => router.refresh(), 2000)
+      } else {
+        setStepStatus(s => ({ ...s, [step]: 'error' }))
+        setStepResult(s => ({ ...s, [step]: data.error || 'Mislukt' }))
+      }
+    } catch (err) {
+      setStepStatus(s => ({ ...s, [step]: 'error' }))
+      setStepResult(s => ({ ...s, [step]: String(err) }))
+    }
+  }
 
   const publishPost = async (postId: string) => {
     setPublishingId(postId)
@@ -41,6 +90,7 @@ export default function PdfDashboardClient({ data }: { data: any }) {
 
   const tabs = [
     { key: 'overview', label: 'Overzicht', icon: '📊' },
+    { key: 'actions', label: 'Acties', icon: '⚡' },
     { key: 'images', label: 'Afbeeldingen', icon: '🖼️' },
     { key: 'social', label: `Social (${posts.length})`, icon: '📱' },
     { key: 'template', label: 'Template', icon: '📄' },
@@ -169,6 +219,62 @@ export default function PdfDashboardClient({ data }: { data: any }) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ACTIONS */}
+      {activeTab === 'actions' && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <h2 className="font-bold text-lg mb-1">⚡ Taken uitvoeren</h2>
+          <p className="text-sm text-gray-500 mb-6">Elke taak staat op zichzelf — klik er een aan als je die content wilt genereren.</p>
+          <div className="space-y-3">
+            {STEPS.map(step => {
+              const status = stepStatus[step.key]
+              const result = stepResult[step.key]
+              return (
+                <div key={step.key} className={`flex items-center justify-between p-4 rounded-xl border transition ${
+                  status === 'done' ? 'bg-green-50 border-green-200' :
+                  status === 'error' ? 'bg-red-50 border-red-200' :
+                  status === 'loading' ? 'bg-indigo-50 border-indigo-200' :
+                  'bg-gray-50 border-gray-100'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{step.icon}</span>
+                    <div>
+                      <p className="font-semibold text-sm text-gray-800">{step.label}</p>
+                      <p className="text-xs text-gray-500">{step.description}</p>
+                      {result && (
+                        <p className={`text-xs mt-0.5 font-medium ${status === 'error' ? 'text-red-600' : 'text-green-700'}`}>
+                          {status === 'done' ? '✓ ' : '✗ '}{result}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => runStep(step.key)}
+                    disabled={status === 'loading'}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap ${
+                      status === 'loading' ? 'bg-indigo-400 text-white cursor-not-allowed' :
+                      status === 'done' ? 'bg-green-600 text-white hover:bg-green-700' :
+                      status === 'error' ? 'bg-red-600 text-white hover:bg-red-700' :
+                      'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
+                  >
+                    {status === 'loading' && (
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    )}
+                    {status === 'idle' && 'Uitvoeren'}
+                    {status === 'loading' && 'Bezig...'}
+                    {status === 'done' && 'Opnieuw'}
+                    {status === 'error' && 'Opnieuw'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-gray-400 mt-5">
+            Resultaten verschijnen na uitvoeren in de bijbehorende tabs. PDF en social content verschijnen direct na genereren.
+          </p>
         </div>
       )}
 
