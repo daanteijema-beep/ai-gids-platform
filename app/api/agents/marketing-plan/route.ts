@@ -60,9 +60,11 @@ export async function POST(req: NextRequest) {
 
     const marketingLearnings = await haalMarketingLearnings(idee.type)
 
-    const prompt = `Je bent een B2B marketing strateeg. Maak een volledig marketing plan voor dit AI-product voor de Nederlandse markt.
+    const prompt = `Je bent een fractional CMO gespecialiseerd in B2B SaaS voor het Nederlandse MKB.
+Gebruik de volgende bewezen marketing frameworks om een concreet plan te maken.
 
-Product: ${idee.naam} — ${idee.tagline}
+PRODUCT:
+Naam: ${idee.naam} — ${idee.tagline}
 Beschrijving: ${idee.beschrijving}
 Doelgroep: ${idee.doelgroep}
 Pijnpunt: ${idee.pijnpunt}
@@ -70,28 +72,52 @@ Type: ${idee.type}
 Prijs: ${idee.prijsindicatie}
 ${marketingLearnings}
 
-Geef JSON:
+FRAMEWORK 1 — ICP (Ideal Customer Profile):
+Definieer één specifiek persoon, niet een breed segment. Zo specifiek dat je ze kunt opbellen.
+
+FRAMEWORK 2 — Positionering (CMO Advisor template):
+"Voor [doelklant] die [behoefte/probleem heeft], is [productnaam] een [categorie] die [kernvoordeel biedt].
+Anders dan [alternatief], biedt ons product [primaire differentiatie]."
+
+FRAMEWORK 3 — Email sequentie (Email Marketing drip-structuur):
+- Dag 1: Pain hook — raak het pijnpunt, geen pitch. Doel: reply uitlokken.
+- Dag 4: Amplify + bewijs — vergroot urgentie met concreet voorbeeld/statistiek.
+- Dag 10: Oplossing + CTA — presenteer product als logische stap, zachte CTA.
+Onderwerpen: max 50 tekens, geen spam-woorden, persoonlijk.
+
+FRAMEWORK 4 — Meta Ads (Advantage+ structuur):
+Campaign → Ad Set → Ad. Één doel per campagne.
+Gebruik Advantage+ Audience voor brede targeting, laat algoritme optimaliseren.
+Naming: META_[Doel]_[Doelgroep]_[Aanbod]_[Datum]
+
+FRAMEWORK 5 — Full-funnel (TOFU/MOFU/BOFU):
+- TOFU (Awareness): LinkedIn thought leadership, SEO informatief
+- MOFU (Consideration): Retargeting, gated content, email nurture
+- BOFU (Decision): Direct outreach, gratis demo/proef, case studies
+
+Geef JSON (alleen JSON, geen tekst eromheen):
 {
   "icp": {
-    "functietitel": "exacte functie/rol",
-    "sector": "branche",
+    "functietitel": "exacte rol, bijv. 'zelfstandig installateur'",
+    "sector": "specifieke branche",
     "bedrijfsgrootte": "1-5 / 5-15 / 15-50 medewerkers",
-    "locatie": "Nederland — focus steden/regio",
+    "locatie": "focus regio Nederland",
     "leeftijd": "X-Y jaar",
     "tech_niveau": "laag/gemiddeld/hoog",
-    "dagelijkse_frustratie": "concreet scenario: 'Elke maandag besteed ik 3 uur aan...'",
+    "dagelijkse_frustratie": "concreet: 'Elke vrijdag besteed ik 2 uur aan...'",
     "beslisser": true,
-    "budget_tools": "€X-Y per maand voor software",
-    "vindt_oplossingen_via": "LinkedIn/Google/collega/etc"
+    "budget_tools": "€X-Y/maand voor software",
+    "vindt_oplossingen_via": "LinkedIn/Google/collega/vakblad/etc"
   },
+  "positionering": "Ingevuld positioneringsstatement op basis van CMO Advisor template",
   "email_strategie": {
     "toon": "informeel/professioneel/direct",
     "sequentie": [
-      { "dag": 1, "onderwerp": "prikkelend onderwerp max 50 tekens", "haak": "eerste zin die stopt met scrollen", "structuur": "pain hook", "doel": "reply uitlokken" },
-      { "dag": 4, "onderwerp": "...", "haak": "...", "structuur": "amplify + bewijs", "doel": "interesse verdiepen" },
-      { "dag": 10, "onderwerp": "...", "haak": "...", "structuur": "oplossing + CTA", "doel": "demo/aankoop" }
+      { "dag": 1, "onderwerp": "max 50 tekens — pain hook", "haak": "eerste zin die stopt met scrollen", "structuur": "pain hook — geen pitch", "doel": "reply uitlokken" },
+      { "dag": 4, "onderwerp": "...", "haak": "...", "structuur": "amplify + bewijs/statistiek", "doel": "urgentie vergroten" },
+      { "dag": 10, "onderwerp": "...", "haak": "...", "structuur": "oplossing + zachte CTA", "doel": "demo/aankoop" }
     ],
-    "cta": "concrete actie",
+    "cta": "concrete actie (bijv. '15 min call')",
     "beste_verzendtijden": "dag + tijd"
   },
   "social_plan": {
@@ -99,34 +125,37 @@ Geef JSON:
       "post_types": ["educatief", "pijnpunt", "bewijs", "behind-scenes"],
       "frequentie": "X per week",
       "beste_tijdstip": "dag hh:mm",
-      "haak_formule": "concrete openingszin structuur"
+      "haak_formule": "concrete openingszin structuur die werkt voor deze doelgroep",
+      "tofu_themas": ["TOFU idee 1", "TOFU idee 2"],
+      "bofu_themas": ["BOFU idee 1"]
     },
     "meta": {
-      "campagne_doel": "awareness/leads/conversie",
+      "campagne_naam": "META_[Doel]_[Doelgroep]_[Aanbod]_2026",
+      "campagne_doel": "leads/conversie",
+      "ad_set": "Advantage+ Audience — breed, laat algoritme optimaliseren",
       "ad_formaat": "video/carousel/single image",
-      "doelgroep_targeting": "interesses + gedragingen in Meta",
       "budget_indicatie": "€X/dag",
-      "creatief_concept": "visueel idee dat converteert"
+      "creatief_concept": "visueel concept dat converteert voor deze doelgroep"
     },
     "instagram": {
-      "content_mix": "X% educatief, Y% entertainment, Z% promotie",
+      "content_mix": "X% educatief, Y% bewijs, Z% promotie",
       "beste_formats": ["reel", "carrousel", "story"],
-      "hashtag_strategie": "mix groot/midden/niche"
+      "hashtag_strategie": "mix groot/midden/niche — 8-12 per post"
     }
   },
   "key_messages": [
-    "kernboodschap 1 (max 10 woorden, actief)",
-    "kernboodschap 2",
-    "kernboodschap 3",
+    "kernboodschap 1 (max 10 woorden, actief, BOFU)",
+    "kernboodschap 2 (MOFU — bewijs/vergelijking)",
+    "kernboodschap 3 (TOFU — pijnpunt herkenning)",
     "kernboodschap 4",
     "kernboodschap 5"
   ],
   "zoekwoorden": {
     "primair": ["zoekwoord 1", "zoekwoord 2"],
-    "long_tail": ["long tail 1"],
+    "long_tail": ["long tail 1", "long tail 2"],
     "negatief": ["uitsluiten 1"]
   },
-  "onderscheidend_vermogen": "1 zin: wat maakt dit uniek"
+  "onderscheidend_vermogen": "1 zin: wat maakt dit uniek vs ChatGPT en generieke tools"
 }
 Alleen JSON.`
 
