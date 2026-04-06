@@ -90,21 +90,41 @@ Antwoord ALLEEN in dit JSON formaat:
     generated_at: new Date().toISOString(),
   })
 
-  // 5. Generate social posts (14 posts over 2 weeks)
+  // 5. Load social trends learnings to inform content agent
+  const { data: trendLearnings } = await supabaseAdmin
+    .from('agent_learnings')
+    .select('insight')
+    .eq('learning_type', 'content_strategy')
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  const trendsContext = trendLearnings?.length
+    ? `\n\nGEBRUIK DEZE ACTUELE TRENDS UIT RESEARCH:\n${trendLearnings.map(l => `- ${l.insight}`).join('\n')}`
+    : ''
+
+  // 5. Generate social posts (21 posts over 3 weeks)
   const socialResponse = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4000,
+    max_tokens: 5000,
     messages: [
       {
         role: 'user',
-        content: `Maak een 2-weeks social media contentplan voor dit PDF product:
+        content: `Maak een 3-weeks social media contentplan voor dit PDF product:
 
 Title: ${idea.title}
 Doelgroep: ${idea.target_audience}
+Niche: ${idea.niche}
 Prijs: €${idea.estimated_price}
+${trendsContext}
 
-Maak 14 posts: mix van Instagram (6), LinkedIn (5), en Instagram Reels ideeën (3).
-Mix ook post types: awareness (maak bewust van het probleem), interest (toon de oplossing), conversion (koop nu).
+Maak 21 posts verspreid over 3 weken:
+- Instagram feed: 7 posts (carousels, foto's, citaten)
+- Instagram Reels ideeën: 4 (met hook + script outline)
+- LinkedIn: 6 posts (zakelijker toon, meer tekst)
+- TikTok scripts: 4 (korte hooks, herkenbare situaties)
+
+Post types verdelen: 7x awareness, 7x interest, 7x conversion.
+Gebruik actuele trends en hooks waar mogelijk.
 
 Antwoord ALLEEN in dit JSON formaat:
 {
@@ -112,9 +132,9 @@ Antwoord ALLEEN in dit JSON formaat:
     {
       "platform": "instagram",
       "post_type": "awareness",
-      "content_text": "volledige post tekst...",
-      "hashtags": ["#hashtag1", "#hashtag2"],
-      "visual_description": "beschrijving van het beeld",
+      "content_text": "volledige post tekst inclusief witregels...",
+      "hashtags": ["#zzpnederland", "#aitools"],
+      "visual_description": "concreet wat er op het beeld moet staan",
       "days_from_now": 1
     }
   ]

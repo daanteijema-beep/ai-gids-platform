@@ -1,98 +1,163 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { supabaseAdmin, AgentLearning, FormField } from '../supabase'
+import { supabaseAdmin, AgentLearning } from '../supabase'
 
 const client = new Anthropic()
 
+function stripJson(text: string) {
+  return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+}
+
+// Extract the final JSON from a multi-turn web search conversation
+function extractFinalJson(_messages: Anthropic.MessageParam[], finalText: string): string {
+  // Find last JSON block in the response
+  const jsonMatch = finalText.match(/\{[\s\S]*"ideas"[\s\S]*\}/)
+  if (jsonMatch) return jsonMatch[0]
+  return stripJson(finalText)
+}
+
 export async function runResearchAgent() {
-  // Fetch recent learnings to inform the agent
+  // Load learnings from orchestrator
   const { data: learnings } = await supabaseAdmin
     .from('agent_learnings')
-    .select('*')
+    .select('learning_type, insight')
     .order('created_at', { ascending: false })
     .limit(20)
 
   const learningsSummary = learnings?.length
-    ? learnings.map((l: AgentLearning) => `- [${l.learning_type}] ${l.insight}`).join('\n')
-    : 'Nog geen learnings beschikbaar — dit is de eerste run.'
+    ? learnings.map((l: Pick<AgentLearning, 'learning_type' | 'insight'>) =>
+        `- [${l.learning_type}] ${l.insight}`
+      ).join('\n')
+    : 'Nog geen learnings — eerste run.'
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4000,
-    messages: [
-      {
-        role: 'user',
-        content: `Je bent een PDF product researcher voor een Nederlands platform dat semi-gepersonaliseerde AI-gidsen verkoopt aan kleine ondernemers (€9-€27 per stuk).
+  // Load existing niches to avoid duplicates
+  const { data: existingIdeas } = await supabaseAdmin
+    .from('pdf_ideas')
+    .select('niche, title')
+    .in('status', ['pending', 'approved', 'published'])
+    .order('created_at', { ascending: false })
+    .limit(30)
 
-Het concept: een klant koopt een PDF die hun specifieke situatie analyseert. Ze vullen op de landingspagina in wat hun situatie is (branche, kanalen die ze gebruiken, huidige klanten, etc.), en ontvangen een volledig gepersonaliseerde PDF met concrete AI-tips voor hun situatie.
+  const existingNiches = existingIdeas?.map(i => i.niche).join(', ') || 'geen'
 
-Doelgroep: ZZP'ers en kleine bedrijven in Nederland (bouwers, kappers, installateurs, coaches, accountants, horeca, etc.)
+  const systemPrompt = `Je bent een PDF product researcher voor een Nederlands platform dat gepersonaliseerde AI-gidsen verkoopt aan kleine ondernemers (€9-€27).
 
-Wat je hebt geleerd van eerdere PDFs:
+Gebruik web search om ECHTE data te vinden:
+- Zoek op Reddit (r/Netherlands, r/zzp, r/ondernemen) naar pijnpunten van Nederlandse ZZP'ers
+- Zoek op Google naar trending AI-toepassingen voor Nederlandse vakgebieden
+- Controleer forums en communities voor kleine ondernemers in NL
+- Zoek naar welke AI-onderwerpen het meest gezocht worden door Nederlandse ondernemers
+
+Gebaseerd op echte data die je vindt: genereer 3 PDF ideeën.`
+
+  const userPrompt = `Doe research en stel 3 nieuwe PDF productideeën voor.
+
+WAT WE AL HEBBEN (vermijd deze niches): ${existingNiches}
+
+WAT DE ORCHESTRATOR HEEFT GELEERD:
 ${learningsSummary}
 
-Genereer nu 3 nieuwe PDF productideeën. Per idee:
-1. Kies een specifieke niche
-2. Maak een pakkende title (zoals "5x meer klanten als elektricien via social media met AI")
-3. Beschrijf het probleem dat het oplost
-4. Bepaal doelgroep
-5. Stel prijs voor (€9, €12, €15, €19, of €27)
-6. Geef een confidence score (0-100) gebaseerd op marktgrootte en koopbereidheid
-7. Definieer welke form fields de klant invult op de landingspagina (maximaal 5 vragen)
+INSTRUCTIES:
+1. Zoek eerst op het web naar trending pijnpunten van Nederlandse ZZP'ers en kleine bedrijven rond AI-gebruik
+2. Zoek specifiek naar: welke beroepsgroepen zoeken op AI, wat zijn hun grootste problemen, welke communities zijn actief
+3. Baseer je ideeën op wat je ECHT vindt, niet op aannames
+4. Per idee: niche, pakkende title, doelgroep, probleem, prijs (€9/12/15/19/27), confidence score, en 4-5 klantvragen
 
-Antwoord ALLEEN in dit JSON formaat, geen extra tekst:
+Geef je uiteindelijke antwoord in dit JSON formaat:
 {
+  "research_summary": "wat je hebt gevonden online in 2-3 zinnen",
   "ideas": [
     {
-      "niche": "elektricien",
-      "title": "5x meer klanten als elektricien via social media met AI",
+      "niche": "...",
+      "title": "...",
       "subtitle": "Een persoonlijk stappenplan voor jouw situatie",
-      "target_audience": "ZZP elektriciens en kleine elektriciteitsbedrijven",
-      "problem_solved": "Elektriciens krijgen nauwelijks klanten via social media en weten niet hoe AI ze daarbij kan helpen",
+      "target_audience": "...",
+      "problem_solved": "...",
       "estimated_price": 15,
-      "research_rationale": "Elektriciens zijn een grote niche in NL, hebben hoge uurtarieven (dus bereid te betalen), en social media is een pijnpunt",
-      "agent_confidence_score": 78,
+      "research_rationale": "gevonden op [bron]: ...",
+      "agent_confidence_score": 75,
       "form_fields": [
-        {
-          "key": "current_channels",
-          "label": "Welke social media gebruik je nu?",
-          "type": "select",
-          "options": ["Geen", "Alleen Facebook", "Instagram", "LinkedIn", "Facebook + Instagram"],
-          "required": true
-        },
-        {
-          "key": "current_clients_per_month",
-          "label": "Hoeveel nieuwe klanten krijg je gemiddeld per maand?",
-          "type": "number",
-          "placeholder": "bijv. 3",
-          "required": true
-        },
-        {
-          "key": "biggest_challenge",
-          "label": "Wat is jouw grootste uitdaging met klanten werven?",
-          "type": "textarea",
-          "placeholder": "bijv. Ik weet niet wat ik moet posten",
-          "required": true
-        },
-        {
-          "key": "time_available",
-          "label": "Hoeveel tijd per week heb je voor marketing?",
-          "type": "select",
-          "options": ["Minder dan 1 uur", "1-2 uur", "2-5 uur", "Meer dan 5 uur"],
-          "required": true
-        }
+        {"key": "sector", "label": "Wat is je beroep/sector?", "type": "text", "placeholder": "bijv. elektricien", "required": true},
+        {"key": "current_channels", "label": "Welke social media gebruik je nu?", "type": "select", "options": ["Geen", "Facebook", "Instagram", "LinkedIn", "TikTok", "Meerdere"], "required": true},
+        {"key": "biggest_challenge", "label": "Wat is je grootste uitdaging met klanten werven?", "type": "textarea", "placeholder": "bijv. ik weet niet wat ik moet posten", "required": true},
+        {"key": "current_clients_month", "label": "Hoeveel nieuwe klanten per maand?", "type": "number", "placeholder": "bijv. 3", "required": true},
+        {"key": "time_for_marketing", "label": "Hoeveel uur per week voor marketing?", "type": "select", "options": ["<1 uur", "1-2 uur", "2-5 uur", ">5 uur"], "required": true}
       ]
     }
   ]
-}`,
-      },
-    ],
-  })
+}`
 
-  const content = response.content[0]
-  if (content.type !== 'text') throw new Error('Unexpected response type')
+  // Use web_search tool for real research
+  const messages: Anthropic.MessageParam[] = [
+    { role: 'user', content: userPrompt }
+  ]
 
-  const raw = content.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+  let finalText = ''
+  let attempts = 0
+  const maxAttempts = 8 // prevent infinite loops
+
+  // Agentic loop: keep going until Claude stops using tools
+  let currentMessages = [...messages]
+
+  while (attempts < maxAttempts) {
+    attempts++
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 5000,
+      system: systemPrompt,
+      tools: [
+        {
+          type: 'web_search_20250305' as any,
+          name: 'web_search',
+          max_uses: 5,
+        } as any,
+      ],
+      messages: currentMessages,
+    })
+
+    // Collect text content
+    const textBlocks = response.content.filter(b => b.type === 'text')
+    if (textBlocks.length > 0) {
+      finalText = (textBlocks[textBlocks.length - 1] as Anthropic.TextBlock).text
+    }
+
+    // If no more tool use, we're done
+    if (response.stop_reason === 'end_turn') break
+
+    // If tool use, add assistant response and continue
+    if (response.stop_reason === 'tool_use') {
+      currentMessages.push({ role: 'assistant', content: response.content })
+
+      // Build tool results
+      const toolResults: Anthropic.ToolResultBlockParam[] = response.content
+        .filter(b => b.type === 'tool_use')
+        .map(b => ({
+          type: 'tool_result' as const,
+          tool_use_id: (b as Anthropic.ToolUseBlock).id,
+          content: 'Search completed.',
+        }))
+
+      if (toolResults.length > 0) {
+        currentMessages.push({ role: 'user', content: toolResults })
+      }
+    } else {
+      break
+    }
+  }
+
+  if (!finalText) throw new Error('Research agent produced no output')
+
+  const raw = extractFinalJson(currentMessages, finalText)
   const parsed = JSON.parse(raw)
+
+  // Save research summary as a learning
+  if (parsed.research_summary) {
+    await supabaseAdmin.from('agent_learnings').insert({
+      learning_type: 'general',
+      insight: `[Research run] ${parsed.research_summary}`,
+      data_points: { source: 'web_research', timestamp: new Date().toISOString() },
+    })
+  }
 
   const insertedIds: string[] = []
   for (const idea of parsed.ideas) {
@@ -117,5 +182,5 @@ Antwoord ALLEEN in dit JSON formaat, geen extra tekst:
     insertedIds.push(data.id)
   }
 
-  return { count: insertedIds.length, ids: insertedIds }
+  return { count: insertedIds.length, ids: insertedIds, researchSummary: parsed.research_summary }
 }
