@@ -97,38 +97,45 @@ async function generateSwipeFile(opts: GenerateOpts): Promise<{ html: string; se
     max_tokens: 4000,
     messages: [{
       role: 'user',
-      content: `Maak een professionele swipe file voor Nederlandse ZZP'ers. Dit is een bundel kant-en-klare teksten die ze DIRECT kunnen kopiëren en gebruiken — geen uitleg nodig, gewoon plakken en versturen.
+      content: `Je bent een expert copywriter. Maak een swipe file voor Nederlandse ZZP'ers die ze morgen al kunnen gebruiken. Elke tekst is kant-en-klaar — kopiëren, invullen, versturen.
 
 Product: ${title}
 Niche: ${niche}
 Doelgroep: ${doelgroep}
-Probleem: ${probleem}
+Probleem dat dit oplost: ${probleem}
 
-SCHRIJFSTIJL:
-- Alle teksten al uitgeschreven in jij/u-vorm passend bij de niche
-- Professioneel maar menselijk
-- [NAAM KLANT] en [JOUW NAAM] als invulvelden waar nodig
-- Elke tekst staat op zichzelf — kopieer en klaar
+COPYWRITING PRINCIPES (pas toe op ELKE tekst):
+- Voordelen > kenmerken: schrijf wat het de lezer oplevert, niet wat het "is"
+- Specifiek > vaag: "binnen 48 uur" > "snel", "€150 korting" > "goedkoper"
+- Klantentaal: gebruik woorden die ${niche} zelf gebruikt, geen jargon
+- Actieve stem, directe toon — jij-vorm
+- Jobs-to-be-done: elke tekst helpt met een concrete taak die ze nu handmatig doen
+- Geen uitroeptekens, geen superlatieven ("beste", "geweldig") — vertrouwen door concreetheid
 
-STRUCTUUR (geef terug als JSON, GEEN markdown):
+KWALITEITSEIS PER TEKST:
+- Zo specifiek dat een andere niche hem NIET kan gebruiken
+- Invulvelden duidelijk: [NAAM KLANT], [DATUM], [BEDRAG], [JOUW NAAM], etc.
+- Realistisch en geloofwaardig — klinkt als een echte professional, niet als een template
+
+STRUCTUUR (JSON, GEEN markdown):
 {
-  "intro": "2 zinnen wat deze swipe file inhoudt en hoe je hem gebruikt",
+  "intro": "1 zin die beschrijft wat iemand na deze swipe file kan die ze daarvoor niet konden",
   "sections": [
     {
-      "title": "Categorie naam (bijv. 'Nieuwe klanten aanschrijven')",
+      "title": "Actie-gerichte categorie (bijv. 'Nieuwe opdrachten binnenhalen')",
       "items": [
         {
-          "label": "Situatie label (bijv. 'Koude LinkedIn DM — eerste contact')",
-          "text": "De volledige kant-en-klare tekst. Al uitgeschreven. Zo kopiëren en plakken."
+          "label": "Precieze situatie (bijv. 'Eerste contact na netwerkevent — WhatsApp')",
+          "text": "De VOLLEDIGE uitgeschreven tekst. Niet: 'schrijf hier een intro'. Wél: de echte tekst die ze copy-pasten. Met echte zinnen, echte toon, juiste lengte voor het kanaal."
         }
       ]
     }
   ],
-  "usage_tips": ["Tip 1 hoe je deze swipe file het beste gebruikt", "Tip 2"]
+  "usage_tips": ["Concrete tip hoe je de meeste waarde uit deze categorie haalt", "Tip 2"]
 }
 
-Maak PRECIES 4 categorieën met elk 5-8 items. Totaal minimaal 25 teksten.
-De teksten moeten écht bruikbaar zijn voor ${niche} — specifiek voor hun situatie, niet generiek.`
+Maak PRECIES 4 categorieën, elk met 5-8 items. Totaal minimaal 25 volledig uitgeschreven teksten.
+Maak elke tekst zo specifiek voor ${niche} dat hij nergens anders werkt.`
     }]
   })
 
@@ -177,43 +184,51 @@ async function generatePlaybook(opts: GenerateOpts): Promise<{ html: string; sec
     max_tokens: 4000,
     messages: [{
       role: 'user',
-      content: `Maak een concreet playbook (draaiboek) voor Nederlandse ZZP'ers. Dit is een herhaalbaar systeem dat ze elke keer exact kunnen volgen — geen nadenken, gewoon de stappen doen.
+      content: `Je bent een expert in procesoptimalisatie voor ZZP'ers. Maak een playbook dat een herhaalbaar systeem geeft — zo concreet dat ze het zonder nadenken kunnen uitvoeren.
 
 Product: ${title}
 Niche: ${niche}
 Doelgroep: ${doelgroep}
-Probleem: ${probleem}
+Probleem dat dit oplost: ${probleem}
 
-SCHRIJFSTIJL:
-- Elke stap heeft een actie die vandaag te doen is
-- Geef exact aan wat je invoert, wat je terugkrijgt, hoe lang het duurt
-- Noem tools bij naam (ChatGPT, Notion, Moneybird, etc.)
-- Geen vage adviezen — altijd een concrete handeling
+KWALITEITSPRINCIPES:
+- Jobs-to-be-done: elke fase = een concrete job die nu tijd kost
+- Specifiek > vaag: "open ChatGPT en plak deze prompt" > "gebruik AI"
+- Noem echte tools bij naam (ChatGPT, Notion, Moneybird, Exact, WhatsApp, Calendly, etc.)
+- Elke stap heeft exact 1 actie — geen meerdere dingen in één stap
+- Input/output model: wat stop je erin, wat komt eruit, hoe lang duurt het
+- Tijdsbesparingen concreet maken: "van 45 min naar 8 min per offerte"
+- Schrijf alsof een collega uitlegt hoe iets werkt — niet als een handleiding
 
-STRUCTUUR (geef terug als JSON, GEEN markdown):
+VOOR ${niche} SPECIFIEK:
+- Gebruik hun vakjargon en tools
+- Baseer de tijdsinschatting op realistische situaties in hun branche
+- De pijnpunten moeten direct herkenbaar zijn
+
+STRUCTUUR (JSON, GEEN markdown):
 {
-  "intro": "Wat dit systeem doet en wat het je oplevert (2 zinnen)",
-  "promise": "De belofte — bijv. 'Na dit playbook heb je X voor altijd geregeld'",
+  "intro": "Beschrijf de transformatie: van [situatie voor] naar [situatie na] in 2 zinnen",
+  "promise": "Concrete belofte met getal: 'Na dit systeem kost [taak] je X minuten in plaats van Y uur'",
   "phases": [
     {
-      "title": "Fase naam (bijv. 'Voorbereiding — eenmalig 30 min')",
+      "title": "Fase: [Naam] — [tijdsinvestering, bijv. 'eenmalig 20 min' of 'elke week 5 min']",
       "steps": [
         {
-          "title": "Stap titel",
-          "description": "Wat je exact doet — concreet en actiegericht",
-          "input": "Wat je nodig hebt / invult",
-          "output": "Wat je krijgt als het klaar is",
-          "duration": "5 min"
+          "title": "Werkwoordzin als titel (bijv. 'Maak je standaard offerte template')",
+          "description": "Exacte instructie: wat open je, wat typ je, waar klik je. Zo concreet dat iemand het in 1x goed doet.",
+          "input": "Wat je nodig hebt of invult (tool, bestand, info)",
+          "output": "Wat je hebt als deze stap klaar is",
+          "duration": "X min"
         }
       ]
     }
   ],
-  "checklist": ["Checklist item 1 — aan het einde controleer je dit", "Item 2"],
-  "time_saved": "Hoeveel tijd dit systeem je per week bespaart"
+  "checklist": ["Controleer: [concreet meetbaar resultaat]", "Controleer: item 2"],
+  "time_saved": "Concreet: 'Dit bespaart je X uur per [week/maand] — dat is Y uur per jaar'"
 }
 
-Maak PRECIES 3 fases met elk 3-5 stappen. Totaal minimaal 10 stappen.
-Het systeem moet specifiek zijn voor ${niche} — gebruik hun jargon en tools.`
+Maak PRECIES 3 fases met elk 3-5 stappen. Minimaal 12 stappen totaal.
+Elke stap moet zo concreet zijn dat iemand hem blind kan uitvoeren.`
     }]
   })
 
@@ -274,49 +289,62 @@ async function generateToolkit(opts: GenerateOpts): Promise<{ html: string; sect
     max_tokens: 4000,
     messages: [{
       role: 'user',
-      content: `Maak een praktische AI toolkit voor Nederlandse ZZP'ers. Dit is een compleet pakket: de beste tools + kant-en-klare prompts + templates om direct mee aan de slag te gaan.
+      content: `Je bent een AI-expert die toolkits maakt voor Nederlandse ZZP'ers. Maak een toolkit die iemand na 1 uur al resultaat geeft — niet een lijst van tools, maar een compleet systeem dat meteen werkt.
 
 Product: ${title}
 Niche: ${niche}
 Doelgroep: ${doelgroep}
-Probleem: ${probleem}
+Probleem dat dit oplost: ${probleem}
 
-SCHRIJFSTIJL:
-- Prompts zijn al volledig uitgeschreven — kopieer en plak in ChatGPT
-- Tools zijn beoordeeld op prijs/kwaliteit voor ZZP'ers
-- Elke prompt heeft een concreet doel en verwacht resultaat
+KWALITEITSPRINCIPES:
+- Elke prompt is VOLLEDIG uitgeschreven en direct bruikbaar — geen "schrijf hier een prompt over X"
+- Tools zijn gekozen op wat ${niche} écht gebruikt, niet wat hippe tech-mensen gebruiken
+- Voordelen > functies: beschrijf wat de tool voor hen doet, niet wat het kan
+- Specifiek > vaag: prompt resultaten beschrijven in concrete output ("je krijgt een offerte van 3 alinea's")
+- Loss aversion: "zonder deze prompts doe je in 2 uur wat met AI in 10 minuten kan"
+- Quick wins: iets wat ze TODAY al kunnen doen, zonder setup
 
-STRUCTUUR (geef terug als JSON, GEEN markdown):
+PROMPT KWALITEITSEISEN:
+- Elke prompt start met context-setting ("Jij bent een [rol]. Je helpt een [beroep] met [taak].")
+- Variabelen in [HOOFDLETTERS] voor invulvelden
+- Na de prompt: 1 zin wat je terugkrijgt als output
+- Prompts zijn zo specifiek voor ${niche} dat ze ergens anders NIET werken
+
+STRUCTUUR (JSON, GEEN markdown):
 {
-  "intro": "Wat je met deze toolkit kunt bereiken (2 zinnen)",
+  "intro": "Transformatiebeschrijving: van [concreet probleem] naar [concreet resultaat] — met tijdsindicatie",
   "tools": [
     {
-      "name": "Tool naam",
-      "description": "Wat het doet voor ${niche} specifiek",
-      "url": "https://...",
-      "price": "Gratis / €10/mnd / etc."
+      "name": "Exacte tool naam",
+      "description": "Wat het specifiek voor ${niche} doet — concreet voordeel, geen feature-lijst",
+      "url": "https://exacte-url.com",
+      "price": "Gratis / €X/maand / freemium tot X gebruikers"
     }
   ],
   "prompt_sections": [
     {
-      "title": "Sectie naam (bijv. 'Klantcommunicatie automatiseren')",
+      "title": "Resultaatgerichte sectie (bijv. 'In 10 minuten een professionele offerte')",
       "prompts": [
         {
-          "title": "Prompt naam",
-          "use_case": "Wanneer gebruik je dit",
-          "prompt": "De volledige uitgeschreven prompt die je copy-paste in ChatGPT. Gebruik [INVULVELD] voor variabelen."
+          "title": "Wat je bereikt met deze prompt",
+          "use_case": "Exacte situatie: wanneer open je ChatGPT en gebruik je dit",
+          "prompt": "De VOLLEDIGE prompt. Begin met context. Gebruik [INVULVELDEN]. Eindig met specifieke instructie voor de output. Minimaal 4 zinnen."
         }
       ]
     }
   ],
-  "quick_wins": ["Quick win 1 — wat je vandaag al kunt doen met deze toolkit", "Quick win 2"]
+  "quick_wins": [
+    "Vandaag in 5 min: open ChatGPT en doe [exacte actie] — je hebt dan [concreet resultaat]",
+    "Quick win 2 even specifiek",
+    "Quick win 3"
+  ]
 }
 
 Maak:
-- 4-6 tools (specifiek voor ${niche})
-- 3 prompt secties met elk 3-5 prompts
-- Totaal minimaal 12 volledig uitgeschreven prompts
-- 3 quick wins`
+- 4-6 tools (echt gebruikt door ${niche}, niet alleen voor tech-mensen)
+- 3 prompt secties met elk 4-5 volledig uitgeschreven prompts
+- Totaal minimaal 14 prompts
+- 3 quick wins die vandaag al werken`
     }]
   })
 
