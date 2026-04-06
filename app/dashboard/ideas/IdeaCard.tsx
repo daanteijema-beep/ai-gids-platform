@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type FormField = {
   key: string
@@ -25,40 +26,30 @@ type Idea = {
 }
 
 export default function IdeaCard({ idea }: { idea: Idea }) {
-  const [loading, setLoading] = useState<'approve' | 'reject' | null>(null)
-  const [done, setDone] = useState<'approved' | 'rejected' | null>(null)
+  const router = useRouter()
+  const [rejecting, setRejecting] = useState(false)
+  const [rejected, setRejected] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
-  const act = async (action: 'approve' | 'reject') => {
-    setLoading(action)
+  const reject = async () => {
+    setRejecting(true)
     try {
-      const res = await fetch(`/api/ideas/${idea.id}/${action}`, {
+      const res = await fetch(`/api/ideas/${idea.id}/reject`, {
         method: 'POST',
         headers: { 'x-dashboard-password': 'admin123' },
       })
-      if (res.ok) {
-        setDone(action === 'approve' ? 'approved' : 'rejected')
-      }
+      if (res.ok) setRejected(true)
     } catch {
       // ignore
     } finally {
-      setLoading(null)
+      setRejecting(false)
     }
   }
 
-  if (done === 'rejected') {
+  if (rejected) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 opacity-50">
         <p className="text-gray-400 line-through text-sm">{idea.title} — afgewezen</p>
-      </div>
-    )
-  }
-
-  if (done === 'approved') {
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-        <p className="text-green-700 font-medium">{idea.title}</p>
-        <p className="text-green-600 text-sm mt-1">Goedgekeurd — execution agent draait nu op de achtergrond...</p>
       </div>
     )
   }
@@ -133,18 +124,17 @@ export default function IdeaCard({ idea }: { idea: Idea }) {
         </p>
         <div className="flex gap-2">
           <button
-            onClick={() => act('reject')}
-            disabled={!!loading}
+            onClick={reject}
+            disabled={rejecting}
             className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 transition disabled:opacity-50"
           >
-            {loading === 'reject' ? '...' : 'Afwijzen'}
+            {rejecting ? '...' : 'Afwijzen'}
           </button>
           <button
-            onClick={() => act('approve')}
-            disabled={!!loading}
-            className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 font-medium"
+            onClick={() => router.push(`/dashboard/ideas/${idea.id}?autoApprove=1`)}
+            className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
           >
-            {loading === 'approve' ? 'Starten...' : 'Goedkeuren & publiceren'}
+            Goedkeuren & publiceren →
           </button>
         </div>
       </div>
