@@ -21,15 +21,40 @@ async function getMetaConfig(): Promise<{ token: string; igAccountId: string } |
   return null
 }
 
-async function postToInstagram(caption: string): Promise<string | null> {
+function generateImageUrl(visualDescription: string): string {
+  const prompt = encodeURIComponent(
+    `${visualDescription}, professional social media post, clean modern design, Dutch entrepreneur, high quality`
+  )
+  return `https://image.pollinations.ai/prompt/${prompt}?model=flux&width=1080&height=1080&nologo=true`
+}
+
+async function postToInstagram(caption: string, imageUrl: string): Promise<string | null> {
   const config = await getMetaConfig()
   if (!config) return null
+  const { token, igAccountId } = config
 
   try {
-    // Instagram requires an image for feed posts — skip if no image
-    // Text-only is not supported on Instagram feed; return null gracefully
-    return null
-  } catch {
+    const mediaUrl = new URL(`https://graph.facebook.com/v21.0/${igAccountId}/media`)
+    mediaUrl.searchParams.set('caption', caption)
+    mediaUrl.searchParams.set('access_token', token)
+    mediaUrl.searchParams.set('image_url', imageUrl)
+
+    const mediaRes = await fetch(mediaUrl.toString(), { method: 'POST' })
+    const mediaData = await mediaRes.json() as { id?: string; error?: { message: string } }
+    if (!mediaData.id) {
+      console.error('Instagram media create error:', mediaData.error)
+      return null
+    }
+
+    const publishUrl = new URL(`https://graph.facebook.com/v21.0/${igAccountId}/media_publish`)
+    publishUrl.searchParams.set('creation_id', mediaData.id)
+    publishUrl.searchParams.set('access_token', token)
+
+    const publishRes = await fetch(publishUrl.toString(), { method: 'POST' })
+    const publishData = await publishRes.json() as { id?: string }
+    return publishData.id || null
+  } catch (err) {
+    console.error('Instagram post error:', err)
     return null
   }
 }
@@ -90,7 +115,8 @@ export async function POST(
   let externalId: string | null = null
 
   if (post.platform === 'instagram') {
-    externalId = await postToInstagram(fullText)
+    const imageUrl = generateImageUrl(post.visual_description || post.content_text.slice(0, 100))
+    externalId = await postToInstagram(fullText, imageUrl)
   } else if (post.platform === 'linkedin') {
     externalId = await postToLinkedIn(fullText)
   }
@@ -106,7 +132,7 @@ export async function POST(
     published: true,
     externalId,
     note: post.platform === 'instagram' && !externalId
-      ? 'Instagram auto-post vereist een afbeelding — verbind je Meta account en upload via de Instagram app.'
+      ? 'Instagram post mislukt — zorg dat je Meta account verbonden is via /dashboard/settings.'
       : null,
   })
 }

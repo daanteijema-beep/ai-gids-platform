@@ -50,6 +50,13 @@ type EmailSeq = {
 }
 
 const PLATFORM_ICON: Record<string, string> = { instagram: '📸', linkedin: '💼', tiktok: '🎵' }
+
+function generateImageUrl(visualDescription: string): string {
+  const prompt = encodeURIComponent(
+    `${visualDescription}, professional social media post, clean modern design, Dutch entrepreneur, high quality`
+  )
+  return `https://image.pollinations.ai/prompt/${prompt}?model=flux&width=512&height=512&nologo=true`
+}
 const TYPE_COLOR: Record<string, string> = {
   awareness: 'bg-blue-100 text-blue-700',
   interest: 'bg-yellow-100 text-yellow-700',
@@ -373,9 +380,20 @@ export default function IdeaDetailPage() {
                             <p className="text-xs text-indigo-500 mt-2">{post.hashtags.join(' ')}</p>
                           )}
                           {post.visual_description && (
-                            <p className="text-xs text-gray-400 mt-1 bg-gray-50 rounded px-2 py-1">
-                              <span className="font-medium">Beeld: </span>{post.visual_description}
-                            </p>
+                            <div className="mt-2 flex items-start gap-2">
+                              {post.platform === 'instagram' && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={generateImageUrl(post.visual_description)}
+                                  alt="gegenereerde afbeelding"
+                                  className="w-16 h-16 rounded-lg object-cover flex-shrink-0 bg-gray-100"
+                                  loading="lazy"
+                                />
+                              )}
+                              <p className="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1 flex-1">
+                                <span className="font-medium">Beeld: </span>{post.visual_description}
+                              </p>
+                            </div>
                           )}
                         </div>
                         <div className="flex-shrink-0 mt-1">

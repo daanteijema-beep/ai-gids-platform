@@ -11,6 +11,14 @@ function stripJson(text: string) {
   return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
 }
 
+// ─── Image generation via Pollinations.ai (free, no API key) ────────────────
+function generateImageUrl(visualDescription: string): string {
+  const prompt = encodeURIComponent(
+    `${visualDescription}, professional social media post, clean modern design, Dutch entrepreneur, high quality`
+  )
+  return `https://image.pollinations.ai/prompt/${prompt}?model=flux&width=1080&height=1080&nologo=true`
+}
+
 // Load Meta config from Supabase (set by OAuth callback) or fall back to env
 async function getMetaConfig(): Promise<{ token: string; igAccountId: string } | null> {
   const { data } = await supabaseAdmin
@@ -48,7 +56,6 @@ async function postToInstagram(caption: string, imageUrl?: string): Promise<stri
     if (imageUrl) {
       mediaUrl.searchParams.set('image_url', imageUrl)
     } else {
-      // Text-only post via image placeholder not supported — skip if no image
       return null
     }
 
@@ -192,7 +199,8 @@ Antwoord ALLEEN in dit JSON formaat:
       const fullText = `${post.content_text}\n\n${(post.hashtags || []).join(' ')}`
 
       if (post.platform === 'instagram') {
-        externalPostId = await postToInstagram(fullText)
+        const imageUrl = post.visual_description ? generateImageUrl(post.visual_description) : undefined
+        externalPostId = await postToInstagram(fullText, imageUrl)
       } else if (post.platform === 'linkedin') {
         externalPostId = await postToLinkedIn(fullText)
       }
