@@ -1,0 +1,19 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "a6e8d7aefdc372842204f1b26b146178"
+name = "testttt"
+application_url = "https://vakwebtwente.vercel.app/api/auth/shopify"
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2026-07"
+
+[access_scopes]
+scopes = "read_products,write_products,read_orders,read_inventory,write_inventory"
+
+[auth]
+redirect_urls = [ "https://vakwebtwente.vercel.app/api/auth/shopify/callback" ]
