@@ -1,180 +1,58 @@
-import Anthropic from '@anthropic-ai/sdk'
+/**
+ * Execution Agent — Coordinator
+ * Wordt getriggerd bij goedkeuring van een PDF idee.
+ * Roept 4 subagents aan die parallel kunnen draaien:
+ *   1. Website Subagent  → Stripe, landing page
+ *   2. PDF Subagent      → niche template
+ *   3. Mail Subagent     → email sequenties + aankondiging
+ *   4. Social Subagent   → content + auto-publish
+ */
 import { supabaseAdmin } from '../supabase'
-import { createStripeProduct } from '../stripe'
-import { runTemplateAgent } from './template-agent'
-import { announceNewPdf } from './outreach-agent'
-
-const client = new Anthropic()
+import { runWebsiteSubagent } from './subagents/website-subagent'
+import { runPdfSubagent } from './subagents/pdf-subagent'
+import { runMailSubagent } from './subagents/mail-subagent'
+import { runSocialSubagent } from './subagents/social-subagent'
 
 export async function runExecutionAgent(ideaId: string) {
-  const { data: idea, error } = await supabaseAdmin
-    .from('pdf_ideas')
-    .select('*')
-    .eq('id', ideaId)
-    .single()
+  // Step 1: Website subagent — must run first (creates the PDF record)
+  const { pdfId, slug } = await runWebsiteSubagent(ideaId)
 
-  if (error || !idea) throw new Error('Idea not found')
+  // Step 2: Run PDF, Mail, Social subagents in parallel (all need pdfId)
+  const [pdfResult, mailResult, socialResult] = await Promise.allSettled([
+    runPdfSubagent(pdfId),
+    runMailSubagent(pdfId),
+    runSocialSubagent(pdfId),
+  ])
 
-  // 1. Create Stripe product
-  const { productId, priceId } = await createStripeProduct(
-    idea.title,
-    idea.subtitle,
-    idea.estimated_price
-  )
-
-  // 2. Generate slug
-  const slug = idea.title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .slice(0, 60)
-
-  // 3. Insert PDF record
-  const { data: pdf, error: pdfError } = await supabaseAdmin
-    .from('pdfs')
-    .insert({
-      idea_id: ideaId,
-      title: idea.title,
-      subtitle: idea.subtitle,
-      description: idea.problem_solved,
-      price: idea.estimated_price,
-      stripe_product_id: productId,
-      stripe_price_id: priceId,
-      slug,
-      form_fields: idea.form_fields,
-      active: true,
-    })
-    .select('id')
-    .single()
-
-  if (pdfError || !pdf) throw new Error('Failed to create PDF record')
-
-  // 4. Generate landing page content
-  const landingResponse = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 3000,
-    messages: [
-      {
-        role: 'user',
-        content: `Schrijf Nederlandse landingspagina content voor dit PDF product:
-
-Title: ${idea.title}
-Doelgroep: ${idea.target_audience}
-Probleem: ${idea.problem_solved}
-Prijs: €${idea.estimated_price}
-
-Antwoord ALLEEN in dit JSON formaat:
-{
-  "hero_headline": "...",
-  "hero_subtext": "...",
-  "pain_points": ["...", "...", "..."],
-  "benefits": ["...", "...", "...", "..."],
-  "social_proof": ["Meer dan 500 ondernemers gingen je voor", "..."],
-  "faq": [
-    {"question": "...", "answer": "..."},
-    {"question": "...", "answer": "..."},
-    {"question": "...", "answer": "..."}
-  ]
-}`,
-      },
-    ],
-  })
-
-  const landingContent = landingResponse.content[0]
-  if (landingContent.type !== 'text') throw new Error('Bad landing response')
-  const landingData = JSON.parse(landingContent.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim())
-
-  await supabaseAdmin.from('landing_pages').insert({
-    pdf_id: pdf.id,
-    ...landingData,
-    generated_at: new Date().toISOString(),
-  })
-
-  // 5. Load social trends learnings to inform content agent
-  const { data: trendLearnings } = await supabaseAdmin
-    .from('agent_learnings')
-    .select('insight')
-    .eq('learning_type', 'content_strategy')
-    .order('created_at', { ascending: false })
-    .limit(10)
-
-  const trendsContext = trendLearnings?.length
-    ? `\n\nGEBRUIK DEZE ACTUELE TRENDS UIT RESEARCH:\n${trendLearnings.map(l => `- ${l.insight}`).join('\n')}`
-    : ''
-
-  // 5. Generate social posts (21 posts over 3 weeks)
-  const socialResponse = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 5000,
-    messages: [
-      {
-        role: 'user',
-        content: `Maak een 3-weeks social media contentplan voor dit PDF product:
-
-Title: ${idea.title}
-Doelgroep: ${idea.target_audience}
-Niche: ${idea.niche}
-Prijs: €${idea.estimated_price}
-${trendsContext}
-
-Maak 21 posts verspreid over 3 weken:
-- Instagram feed: 7 posts (carousels, foto's, citaten)
-- Instagram Reels ideeën: 4 (met hook + script outline)
-- LinkedIn: 6 posts (zakelijker toon, meer tekst)
-- TikTok scripts: 4 (korte hooks, herkenbare situaties)
-
-Post types verdelen: 7x awareness, 7x interest, 7x conversion.
-Gebruik actuele trends en hooks waar mogelijk.
-
-Antwoord ALLEEN in dit JSON formaat:
-{
-  "posts": [
-    {
-      "platform": "instagram",
-      "post_type": "awareness",
-      "content_text": "volledige post tekst inclusief witregels...",
-      "hashtags": ["#zzpnederland", "#aitools"],
-      "visual_description": "concreet wat er op het beeld moet staan",
-      "days_from_now": 1
-    }
-  ]
-}`,
-      },
-    ],
-  })
-
-  const socialContent = socialResponse.content[0]
-  if (socialContent.type !== 'text') throw new Error('Bad social response')
-  const socialData = JSON.parse(socialContent.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim())
-
-  const now = new Date()
-  for (const post of socialData.posts) {
-    const scheduledDate = new Date(now)
-    scheduledDate.setDate(scheduledDate.getDate() + (post.days_from_now || 1))
-
-    await supabaseAdmin.from('social_posts').insert({
-      pdf_id: pdf.id,
-      platform: post.platform,
-      post_type: post.post_type,
-      content_text: post.content_text,
-      hashtags: post.hashtags,
-      visual_description: post.visual_description,
-      scheduled_date: scheduledDate.toISOString().split('T')[0],
-      status: 'planned',
-    })
+  // Log any subagent failures (don't throw — partial success is acceptable)
+  if (pdfResult.status === 'rejected') {
+    console.error('PDF subagent failed:', pdfResult.reason)
+  }
+  if (mailResult.status === 'rejected') {
+    console.error('Mail subagent failed:', mailResult.reason)
+  }
+  if (socialResult.status === 'rejected') {
+    console.error('Social subagent failed:', socialResult.reason)
   }
 
-  // 6. Generate PDF template for this niche
-  await runTemplateAgent(pdf.id)
-
-  // 7. Mark idea as published
+  // Step 3: Mark idea as published
   await supabaseAdmin
     .from('pdf_ideas')
     .update({ status: 'published' })
     .eq('id', ideaId)
 
-  // 8. Announce to existing leads (async, non-blocking)
-  announceNewPdf(pdf.id).catch(err => console.error('Announce error:', err))
-
-  return { pdfId: pdf.id, slug }
+  return {
+    pdfId,
+    slug,
+    subagents: {
+      website: 'success',
+      pdf: pdfResult.status === 'fulfilled' ? `${pdfResult.value.chapters} chapters` : 'failed',
+      mail: mailResult.status === 'fulfilled'
+        ? `${mailResult.value.emailsGenerated} emails, ${mailResult.value.announced} announced`
+        : 'failed',
+      social: socialResult.status === 'fulfilled'
+        ? `${socialResult.value.postsCreated} posts, ${socialResult.value.postsPublished} published`
+        : 'failed',
+    },
+  }
 }
