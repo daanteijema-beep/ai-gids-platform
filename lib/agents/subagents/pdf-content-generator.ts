@@ -94,7 +94,7 @@ async function generateSwipeFile(opts: GenerateOpts): Promise<{ html: string; se
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4000,
+    max_tokens: 2500,
     messages: [{
       role: 'user',
       content: `Je bent een expert copywriter. Maak een swipe file voor Nederlandse ZZP'ers die ze morgen al kunnen gebruiken. Elke tekst is kant-en-klaar — kopiëren, invullen, versturen.
@@ -181,7 +181,7 @@ async function generatePlaybook(opts: GenerateOpts): Promise<{ html: string; sec
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4000,
+    max_tokens: 2500,
     messages: [{
       role: 'user',
       content: `Je bent een expert in procesoptimalisatie voor ZZP'ers. Maak een playbook dat een herhaalbaar systeem geeft — zo concreet dat ze het zonder nadenken kunnen uitvoeren.
@@ -286,7 +286,7 @@ async function generateToolkit(opts: GenerateOpts): Promise<{ html: string; sect
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4000,
+    max_tokens: 2500,
     messages: [{
       role: 'user',
       content: `Je bent een AI-expert die toolkits maakt voor Nederlandse ZZP'ers. Maak een toolkit die iemand na 1 uur al resultaat geeft — niet een lijst van tools, maar een compleet systeem dat meteen werkt.
