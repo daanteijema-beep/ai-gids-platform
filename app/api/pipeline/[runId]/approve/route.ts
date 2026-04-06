@@ -29,6 +29,32 @@ export async function POST(
     if (!product_idea_id) return NextResponse.json({ error: 'product_idea_id vereist bij stap 1' }, { status: 400 })
 
     await supabaseAdmin.from('product_ideas').update({ geselecteerd: true }).eq('id', product_idea_id)
+
+    // Maak automatisch een pdf_idea aan zodat het idee verkoopbaar wordt
+    const { data: idee } = await supabaseAdmin
+      .from('product_ideas')
+      .select('naam, tagline, beschrijving, doelgroep, pijnpunt, type, prijsindicatie, validatiescore')
+      .eq('id', product_idea_id)
+      .single()
+
+    if (idee) {
+      const priceMatch = (idee.prijsindicatie || '').match(/€\s*(\d+)/)
+      const price = priceMatch ? parseFloat(priceMatch[1]) : 29
+      await supabaseAdmin.from('pdf_ideas').insert({
+        product_idea_id,
+        title: idee.naam,
+        subtitle: idee.tagline,
+        target_audience: idee.doelgroep,
+        problem_solved: idee.pijnpunt,
+        estimated_price: price,
+        research_rationale: idee.beschrijving,
+        agent_confidence_score: idee.validatiescore,
+        product_type: idee.type,
+        status: 'pending',
+        niche: idee.doelgroep,
+      })
+    }
+
     // Verhoog huidige_stap zodat dashboard "Marketing agent bezig" toont, niet "Research"
     await supabaseAdmin.from('pipeline_runs').update({ product_idea_id, status: 'running', huidige_stap: 2 }).eq('id', runId)
     await supabaseAdmin.from('pipeline_analytics').insert({

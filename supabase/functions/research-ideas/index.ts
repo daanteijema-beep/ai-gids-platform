@@ -32,6 +32,29 @@ async function haalEerdereIdeeen() {
   return `EERDER GEGENEREERDE IDEEËN — NIET HERHALEN:\n${[...gekozen, ...afgewezen].join('\n')}\nGenereer ideeën die qua sector, doelgroep EN pijnpunt totaal anders zijn.`
 }
 
+async function haalPdfVerkopen() {
+  try {
+    const { data: pdfs } = await supabase.from('pdfs')
+      .select('id, title, description, price').eq('active', true)
+    if (!pdfs?.length) return ''
+
+    const { data: orders } = await supabase.from('pdf_orders')
+      .select('pdf_id').eq('status', 'paid')
+
+    const counts: Record<string, number> = {}
+    for (const o of orders || []) counts[o.pdf_id] = (counts[o.pdf_id] || 0) + 1
+
+    const gesorteerd = pdfs
+      .map((p: Record<string,unknown>) => ({ ...p, verkopen: counts[p.id as string] || 0 }))
+      .sort((a, b) => b.verkopen - a.verkopen)
+      .slice(0, 6)
+
+    return `BESTAANDE PDF-TOOLS (live in de shop):\n${gesorteerd.map((p: Record<string,unknown>) =>
+      `- "${p.title}" €${p.price} — ${p.verkopen} verkopen: ${String(p.description || '').slice(0, 80)}`
+    ).join('\n')}\nResearch ideeën die AANVULLEN op dit aanbod. Zoek adjacente pijnpunten bij dezelfde doelgroep, of nieuwe doelgroepen die baat hebben bij vergelijkbare tools.`
+  } catch { return '' }
+}
+
 async function bepaalZoektermen(context: string): Promise<string[]> {
   const msg = await anthropic.messages.create({
     model: 'claude-sonnet-4-6', max_tokens: 500,
@@ -239,15 +262,16 @@ Deno.serve(async (req: Request) => {
   try {
     await supabase.from('pipeline_analytics').insert({ run_id, event_type: 'run_gestart', stap: 1 })
 
-    const [runData, learnings, eerdereIdeeen] = await Promise.all([
+    const [runData, learnings, eerdereIdeeen, pdfVerkopen] = await Promise.all([
       supabase.from('pipeline_runs').select('notitie').eq('id', run_id).single(),
       haalLearnings(),
       haalEerdereIdeeen(),
+      haalPdfVerkopen(),
     ])
 
     const gebruikerPrompt = runData.data?.notitie
       ? `\nGEBRUIKERSINSTRUCTIE (hoogste prioriteit):\n${runData.data.notitie}\n` : ''
-    const contextBlok = [gebruikerPrompt, learnings, eerdereIdeeen].filter(Boolean).join('\n\n') || 'Eerste run.'
+    const contextBlok = [gebruikerPrompt, learnings, eerdereIdeeen, pdfVerkopen].filter(Boolean).join('\n\n') || 'Eerste run.'
 
     const zoektermen = await bepaalZoektermen(contextBlok)
 
