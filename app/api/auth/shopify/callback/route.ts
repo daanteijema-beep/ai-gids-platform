@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
         client_id: process.env.SHOPIFY_CLIENT_ID,
         client_secret: process.env.SHOPIFY_CLIENT_SECRET,
         code,
-        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/shopify/callback`,
       }),
     })
 
