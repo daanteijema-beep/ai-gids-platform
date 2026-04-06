@@ -27,6 +27,13 @@ async function getData(id: string) {
       .filter('data_points->>pdf_id', 'eq', id)
       .order('created_at', { ascending: false })
       .limit(1),
+    supabaseAdmin.from('agent_learnings')
+      .select('data_points, created_at')
+      .eq('learning_type', 'outreach_strategy')
+      .filter('data_points->>source', 'eq', 'lead_finder')
+      .filter('data_points->>pdf_id', 'eq', id)
+      .order('created_at', { ascending: false })
+      .limit(3),
   ])
 
   return {
@@ -37,6 +44,9 @@ async function getData(id: string) {
     leads: leads.data || [],
     orders: orders.data || [],
     emailSequences: emailLearning.data?.[0]?.data_points?.sequences || [],
+    outreachData: (emailLearning as any)[1]?.data
+      ? (emailLearning as any)[1].data.map((r: any) => r.data_points)
+      : [],
   }
 }
 

@@ -19,7 +19,7 @@ type Order = { id: string; customer_name: string; customer_email: string; status
 type EmailSeq = { trigger: string; subject: string; delay_hours: number }
 
 export default function PdfDashboardClient({ data }: { data: any }) {
-  const { pdf, landing, template, posts, leads, orders, emailSequences } = data
+  const { pdf, landing, template, posts, leads, orders, emailSequences, outreachData } = data
   const [activeTab, setActiveTab] = useState<'overview' | 'images' | 'social' | 'template' | 'leads' | 'emails'>('overview')
   const [socialPlatform, setSocialPlatform] = useState<'instagram' | 'linkedin' | 'tiktok'>('instagram')
   const [publishingId, setPublishingId] = useState<string | null>(null)
@@ -366,24 +366,112 @@ export default function PdfDashboardClient({ data }: { data: any }) {
 
       {/* LEADS */}
       {activeTab === 'leads' && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-6">
-          <h2 className="font-bold text-lg mb-4">👥 Leads ({leads.length})</h2>
-          {leads.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-8">Nog geen leads. Ze worden automatisch verzameld via de landingspagina.</p>
-          ) : (
-            <div className="space-y-0">
-              {leads.map((lead: Lead) => (
-                <div key={lead.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{lead.name || '(geen naam)'}</p>
-                    <p className="text-xs text-gray-500">{lead.email}</p>
+        <div className="space-y-5">
+          {/* Lead list */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            <h2 className="font-bold text-lg mb-4">👥 Email Leads ({leads.length})</h2>
+            {leads.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-6">Nog geen leads. Ze worden automatisch verzameld via de landingspagina.</p>
+            ) : (
+              <div className="space-y-0">
+                {leads.map((lead: Lead) => (
+                  <div key={lead.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{lead.name || '(geen naam)'}</p>
+                      <p className="text-xs text-gray-500">{lead.email}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-400">{new Date(lead.created_at).toLocaleDateString('nl-NL')}</p>
+                      <p className="text-xs text-gray-400">{lead.source}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400">{new Date(lead.created_at).toLocaleDateString('nl-NL')}</p>
-                    <p className="text-xs text-gray-400">{lead.source}</p>
-                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Outreach communities from lead finder */}
+          {outreachData && outreachData.length > 0 ? (
+            outreachData.map((entry: any, idx: number) => (
+              <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-bold text-lg">🎯 Communities & Outreach</h2>
+                  <span className="text-xs text-gray-400">
+                    {entry.generated_at ? new Date(entry.generated_at).toLocaleDateString('nl-NL') : ''}
+                  </span>
                 </div>
-              ))}
+
+                {/* Quick win */}
+                {entry.quick_win && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
+                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">⚡ Quick Win</p>
+                    <p className="text-sm text-amber-900">{entry.quick_win}</p>
+                  </div>
+                )}
+
+                {/* Hashtags */}
+                {entry.hashtags?.length > 0 && (
+                  <div className="mb-5">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Hashtags</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {entry.hashtags.map((tag: string, i: number) => (
+                        <span key={i} className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-mono">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Communities */}
+                {entry.communities?.length > 0 && (
+                  <div className="space-y-4">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{entry.communities.length} communities gevonden</p>
+                    {entry.communities.map((community: any, i: number) => (
+                      <div key={i} className="border border-gray-100 rounded-xl overflow-hidden">
+                        <div className="bg-gray-50 px-4 py-3 flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-semibold text-gray-700">{community.name}</span>
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">{community.platform}</span>
+                              {community.size && <span className="text-xs text-gray-400">{community.size}</span>}
+                            </div>
+                            {community.why_relevant && (
+                              <p className="text-xs text-gray-500 mt-0.5">{community.why_relevant}</p>
+                            )}
+                          </div>
+                          {community.url && (
+                            <a href={community.url} target="_blank" rel="noopener noreferrer"
+                              className="text-xs text-indigo-500 hover:underline flex-shrink-0">
+                              Open →
+                            </a>
+                          )}
+                        </div>
+                        {community.outreach_script && (
+                          <div className="px-4 py-3">
+                            <p className="text-xs font-medium text-gray-400 mb-2">Outreach bericht (klaar voor gebruik):</p>
+                            <div className="bg-white border border-gray-100 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                              {community.outreach_script}
+                            </div>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(community.outreach_script)}
+                              className="mt-2 text-xs text-indigo-500 hover:text-indigo-700"
+                            >
+                              📋 Kopieer
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+              <h2 className="font-bold text-lg mb-3">🎯 Communities & Outreach</h2>
+              <p className="text-gray-400 text-sm text-center py-4">
+                Geen lead data gevonden. De lead finder draait elke dinsdag en donderdag automatisch,<br/>
+                of wordt getriggerd bij goedkeuring van een nieuw idee.
+              </p>
             </div>
           )}
         </div>

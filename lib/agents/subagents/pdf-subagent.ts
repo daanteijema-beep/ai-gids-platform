@@ -1,85 +1,79 @@
 /**
- * PDF Subagent
- * Verantwoordelijk voor: PDF template maken per niche (wordt later gepersonaliseerd per klant)
+ * PDF Subagent — genereert de volledige PDF bij approval
+ * Als er al een draft_pdf_html in pdf_ideas staat, wordt die hergebruikt.
+ * Anders wordt de content opnieuw gegenereerd.
+ *
+ * Opslag:
+ *   - pdfs.generated_pdf_html  → complete HTML (klaar voor email delivery)
+ *   - pdf_templates             → chapter-lijst voor dashboard weergave
  */
-import Anthropic from '@anthropic-ai/sdk'
 import { supabaseAdmin } from '../../supabase'
+import { generatePdfContent } from './pdf-content-generator'
 
-const client = new Anthropic()
-
-function stripJson(text: string) {
-  return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-}
-
-export async function runPdfSubagent(pdfId: string): Promise<{ chapters: number }> {
+export async function runPdfSubagent(pdfId: string): Promise<{ chapters: number; chapterTitles: string[] }> {
   const { data: pdf } = await supabaseAdmin
     .from('pdfs')
-    .select('*, pdf_ideas(niche, target_audience, problem_solved, form_fields)')
+    .select('*, pdf_ideas(niche, target_audience, problem_solved, draft_pdf_html)')
     .eq('id', pdfId)
     .single()
 
   if (!pdf) throw new Error('PDF not found')
 
-  const niche = (pdf.pdf_ideas as any)?.niche || 'ondernemer'
-  const doelgroep = (pdf.pdf_ideas as any)?.target_audience || 'kleine ondernemer'
-  const formFields = pdf.form_fields || []
+  const ideaData = pdf.pdf_ideas as any
+  const niche = ideaData?.niche || 'ondernemer'
+  const doelgroep = ideaData?.target_audience || 'Nederlandse ZZP\'er'
+  const probleem = ideaData?.problem_solved || ''
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 3000,
-    messages: [{
-      role: 'user',
-      content: `Maak een herbruikbare PDF template voor gepersonaliseerde AI-gidsen.
+  let html: string
+  let chapterTitles: string[]
 
-Product: ${pdf.title}
-Niche: ${niche}
-Doelgroep: ${doelgroep}
-Klant beantwoordt: ${formFields.map((f: any) => `"${f.label}" (key: ${f.key})`).join(', ')}
+  // Reuse draft if already generated during research
+  if (ideaData?.draft_pdf_html) {
+    html = ideaData.draft_pdf_html
+    // Extract chapter titles from stored template if available
+    const { data: existing } = await supabaseAdmin
+      .from('pdf_templates')
+      .select('chapters')
+      .eq('pdf_id', pdfId)
+      .maybeSingle()
+    chapterTitles = (existing?.chapters as any[] || []).map((ch: any) => ch.title)
+  } else {
+    // Generate from scratch
+    const result = await generatePdfContent({
+      title: pdf.title,
+      subtitle: pdf.subtitle || '',
+      niche,
+      doelgroep,
+      probleem,
+    })
+    html = result.html
+    chapterTitles = result.chapterTitles
+  }
 
-De template is de STRUCTUUR. Later wordt elke variabele vervangen door klantspecifieke content.
-Variabelen noteer je als {{key}} — gebruik de form field keys van de klant.
+  // Save generated HTML to pdfs table
+  await supabaseAdmin
+    .from('pdfs')
+    .update({ generated_pdf_html: html })
+    .eq('id', pdfId)
 
-Antwoord ALLEEN in dit JSON formaat:
-{
-  "tone_of_voice": "directe beschrijving van schrijfstijl voor deze niche",
-  "chapters": [
-    {
-      "number": 1,
-      "title": "Jouw situatie als {{sector}}",
-      "description": "Persoonlijke analyse van de klant op basis van hun antwoorden",
-      "variables_used": ["sector", "current_channels"],
-      "word_count_target": 400,
-      "key_points": [
-        "altijd terugkomend punt 1 voor deze niche",
-        "altijd terugkomend punt 2"
-      ],
-      "action_item": "Wat doet de klant NA dit hoofdstuk?"
-    }
-  ],
-  "intro_template": "Beste {{customer_name}}, als {{sector}} in Nederland...",
-  "outro_template": "Succes {{customer_name}}. Vragen? Stuur een mail naar...",
-  "variable_map": {
-    "customer_name": "Naam van de klant",
-    "sector": "Beroep/sector van de klant"
-  },
-  "estimated_total_words": 2800
-}`
-    }]
-  })
+  // Save chapter structure to pdf_templates for dashboard display
+  if (chapterTitles.length > 0) {
+    await supabaseAdmin.from('pdf_templates').upsert({
+      pdf_id: pdfId,
+      niche,
+      tone_of_voice: 'direct, praktisch, jij-vorm',
+      chapters: chapterTitles.map((title, i) => ({
+        number: i + 1,
+        title,
+        prompt_instructions: '',
+        word_count_target: 400,
+        variables_used: [],
+      })),
+      intro_template: '',
+      outro_template: '',
+      variable_map: { cover_page: { title: pdf.title, subtitle: pdf.subtitle } },
+    }, { onConflict: 'pdf_id' })
+  }
 
-  const content = response.content[0]
-  if (content.type !== 'text') throw new Error('Bad template response')
-  const template = JSON.parse(stripJson(content.text))
-
-  await supabaseAdmin.from('pdf_templates').upsert({
-    pdf_id: pdfId,
-    niche,
-    tone_of_voice: template.tone_of_voice,
-    chapters: template.chapters,
-    intro_template: template.intro_template,
-    outro_template: template.outro_template,
-    variable_map: template.variable_map,
-  }, { onConflict: 'pdf_id' })
-
-  return { chapters: template.chapters.length }
+  return { chapters: chapterTitles.length, chapterTitles }
 }
