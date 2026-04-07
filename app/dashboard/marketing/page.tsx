@@ -2,207 +2,298 @@
 
 import { useState, useEffect } from 'react'
 
-type Niche = { id: string; naam: string; icon: string; slug: string }
-type Content = {
+type Insight = {
   id: string
-  niche_id: string
+  bron: string
+  zoekterm: string
+  titel: string
+  samenvatting: string
+  aanbevolen_hook: string | null
+  week: string
+  created_at: string
+  niches?: { naam: string; icon: string }
+}
+
+type WeekSamenvatting = {
+  week: string
+  aantal: number
+  hooks: string[]
+  bronnen: string[]
+}
+
+type ContentItem = {
+  id: string
   type: string
   titel: string
   content: unknown
   status: string
   created_at: string
-  niches?: Niche
+  niches?: { naam: string; icon: string }
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  cold_email_sequence: '📧 Cold email reeks',
-  linkedin_posts: '💼 LinkedIn posts',
-  instagram_posts: '📸 Instagram posts',
-  landing_page_copy: '🌐 Landingspagina tekst',
-  whatsapp_script: '💬 WhatsApp script',
+const BRON_META: Record<string, { icon: string; label: string; color: string }> = {
+  google_trends: { icon: '📈', label: 'Google Trends', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  linkedin: { icon: '💼', label: 'LinkedIn', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  reddit: { icon: '🟠', label: 'Reddit', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+  concurrent: { icon: '🔍', label: 'Concurrent', color: 'bg-red-50 text-red-700 border-red-200' },
+}
+
+const TYPE_META: Record<string, { icon: string; label: string }> = {
+  cold_email_sequence: { icon: '📧', label: 'Cold email reeks' },
+  linkedin_posts: { icon: '💼', label: 'LinkedIn posts' },
+  instagram_posts: { icon: '📸', label: 'Instagram posts' },
+  landing_page_copy: { icon: '🌐', label: 'Landingspagina tekst' },
+  whatsapp_script: { icon: '💬', label: 'WhatsApp script' },
+  trend_analyse: { icon: '📊', label: 'Trend analyse' },
+}
+
+function renderContentPreview(item: ContentItem): React.ReactNode {
+  const c = item.content
+  if (Array.isArray(c) && c.length > 0) {
+    return (
+      <div className="space-y-3">
+        {(c as Array<Record<string, string>>).slice(0, 3).map((entry, i) => (
+          <div key={i} className="bg-white rounded-xl border border-slate-100 p-4">
+            {entry.onderwerp && <div className="font-semibold text-xs text-slate-500 mb-1 uppercase tracking-wide">Onderwerp</div>}
+            {entry.onderwerp && <div className="font-medium text-sm text-slate-800 mb-2">{entry.onderwerp}</div>}
+            {entry.titel && <div className="font-medium text-sm text-slate-800 mb-2">{entry.titel}</div>}
+            {entry.haak && <div className="text-xs font-semibold text-orange-600 mb-2">Hook: {entry.haak}</div>}
+            <pre className="text-sm text-slate-600 whitespace-pre-wrap font-sans leading-relaxed">
+              {(entry.tekst || entry.inhoud || entry.body || '').slice(0, 300)}
+              {(entry.tekst || entry.inhoud || entry.body || '').length > 300 ? '...' : ''}
+            </pre>
+          </div>
+        ))}
+        {c.length > 3 && <div className="text-xs text-slate-400 text-center">+ {c.length - 3} meer posts</div>}
+      </div>
+    )
+  }
+  if (typeof c === 'object' && c !== null) {
+    const obj = c as Record<string, unknown>
+    return (
+      <div className="space-y-3">
+        {Object.entries(obj).slice(0, 4).map(([key, val]) => (
+          <div key={key} className="bg-white rounded-xl border border-slate-100 p-4">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{key.replace(/_/g, ' ')}</div>
+            <div className="text-sm text-slate-700 leading-relaxed">
+              {Array.isArray(val) ? (val as string[]).map((v, i) => <div key={i} className="mb-1">• {v}</div>) : String(val)}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return <p className="text-sm text-slate-600">{String(c || '')}</p>
 }
 
 export default function MarketingPage() {
-  const [niches, setNiches] = useState<Niche[]>([])
-  const [content, setContent] = useState<Content[]>([])
-  const [selectedNiche, setSelectedNiche] = useState<string>('')
-  const [selectedType, setSelectedType] = useState<string>('cold_email_sequence')
-  const [generating, setGenerating] = useState(false)
-  const [expanded, setExpanded] = useState<string | null>(null)
+  const [insights, setInsights] = useState<Insight[]>([])
+  const [weekSamenvattingen, setWeekSamenvattingen] = useState<WeekSamenvatting[]>([])
+  const [content, setContent] = useState<ContentItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [scrapingTrends, setScrapingTrends] = useState(false)
+  const [activeTab, setActiveTab] = useState<'trends' | 'content'>('trends')
+  const [activeWeek, setActiveWeek] = useState('')
+  const [expandedContent, setExpandedContent] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch('/api/niches').then(r => r.json()).then(d => {
-      setNiches(d.niches || [])
-      if (d.niches?.length) setSelectedNiche(d.niches[0].id)
-    })
-    fetchContent()
-  }, [])
-
-  async function fetchContent() {
-    const res = await fetch('/api/marketing/list')
-    if (res.ok) {
-      const data = await res.json()
-      setContent(data.content || [])
+  async function fetchAll() {
+    setLoading(true)
+    const [insightsRes, contentRes] = await Promise.all([
+      fetch('/api/content-insights'),
+      fetch('/api/marketing/list'),
+    ])
+    if (insightsRes.ok) {
+      const d = await insightsRes.json()
+      setInsights(d.insights || [])
+      setWeekSamenvattingen(d.weekSamenvattingen || [])
+      if (d.weekSamenvattingen?.length > 0) setActiveWeek(d.weekSamenvattingen[0].week)
     }
-  }
-
-  async function generate() {
-    if (!selectedNiche || !selectedType) return
-    setGenerating(true)
-    await fetch('/api/marketing/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ niche_id: selectedNiche, type: selectedType }),
-    })
-    setGenerating(false)
-    fetchContent()
-  }
-
-  function renderContent(item: Content) {
-    const data = item.content as Record<string, unknown>
-    if (Array.isArray(data)) {
-      return (
-        <div className="space-y-4">
-          {(data as Array<Record<string, string>>).map((entry, i) => (
-            <div key={i} className="bg-slate-50 rounded-lg p-4">
-              {entry.onderwerp && <div className="font-semibold text-sm mb-1">📧 {entry.onderwerp}</div>}
-              {entry.titel && <div className="font-semibold text-sm mb-1">{entry.titel}</div>}
-              {entry.tekst && <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans">{entry.tekst}</pre>}
-              {entry.inhoud && <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans">{entry.inhoud}</pre>}
-            </div>
-          ))}
-        </div>
-      )
+    if (contentRes.ok) {
+      const d = await contentRes.json()
+      setContent(d.content || [])
     }
-    return <pre className="text-xs bg-slate-50 p-4 rounded-lg overflow-auto whitespace-pre-wrap">{JSON.stringify(data, null, 2)}</pre>
+    setLoading(false)
   }
 
-  const filteredContent = selectedNiche
-    ? content.filter(c => c.niches?.id === selectedNiche || c.niche_id === selectedNiche)
-    : content
+  async function scrapeTrends() {
+    setScrapingTrends(true)
+    await fetch('/api/agents/trend-scout', { method: 'POST' })
+    setScrapingTrends(false)
+    void fetchAll()
+  }
+
+  useEffect(() => { void fetchAll() }, [])
+
+  const weekInsights = insights.filter(i => !activeWeek || i.week === activeWeek)
+  const activeWeekData = weekSamenvattingen.find(w => w.week === activeWeek)
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Marketing per Niche</h1>
-        <p className="text-gray-500 mt-1">AI genereert cold emails, social posts en landingspagina-teksten per doelgroep</p>
-      </div>
-
-      {/* Generator */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8">
-        <h2 className="font-bold text-slate-900 mb-4">🤖 Genereer nieuwe content</h2>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1.5">Niche / Doelgroep</label>
-            <select
-              value={selectedNiche}
-              onChange={e => setSelectedNiche(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
-            >
-              {niches.map(n => (
-                <option key={n.id} value={n.id}>{n.icon} {n.naam}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1.5">Type content</label>
-            <select
-              value={selectedType}
-              onChange={e => setSelectedType(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
-            >
-              {Object.entries(TYPE_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={generate}
-              disabled={generating || !selectedNiche}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center justify-center gap-2"
-            >
-              {generating ? (
-                <><span className="animate-spin">⚙️</span> Claude genereert...</>
-              ) : (
-                <><span>✨</span> Genereer content</>
-              )}
-            </button>
-          </div>
+    <div className="p-8 max-w-[1200px]">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Marketing Strategie</h1>
+          <p className="text-slate-500 mt-1 text-sm">Trendinzichten van Reddit, LinkedIn en Google Trends + gegenereerde content</p>
         </div>
-        <p className="text-xs text-slate-400 mt-3">
-          Claude genereert sector-specifieke content in het Nederlands, op maat voor vakbedrijven in Twente.
-        </p>
+        <button
+          onClick={scrapeTrends}
+          disabled={scrapingTrends}
+          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-semibold px-5 py-2.5 rounded-xl transition text-sm"
+        >
+          {scrapingTrends ? <><span className="animate-spin inline-block">⚙️</span> Scrapen...</> : <><span>🔍</span> Scrape trends</>}
+        </button>
       </div>
 
-      {/* Landingspagina links per niche */}
-      <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 mb-8">
-        <h2 className="font-bold text-slate-900 mb-3">🌐 Niche landingspagina&apos;s</h2>
-        <p className="text-sm text-slate-600 mb-4">
-          Elke niche heeft een eigen landingspagina met specifieke tekst, testimonials en aanvraagflow.
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {niches.map(n => (
-            <a
-              key={n.id}
-              href={`/${n.slug}`}
-              target="_blank"
-              className="flex items-center gap-2 bg-white border border-orange-200 rounded-lg px-3 py-2 text-sm hover:border-orange-400 hover:shadow-sm transition"
-            >
-              <span>{n.icon}</span>
-              <span className="font-medium text-slate-700">{n.naam}</span>
-              <span className="ml-auto text-orange-400">↗</span>
-            </a>
-          ))}
-        </div>
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-6 w-fit">
+        {[
+          { key: 'trends', label: '📊 Trend inzichten' },
+          { key: 'content', label: '📄 Gegenereerde content' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key as 'trends' | 'content')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* Gegenereerde content */}
-      <div>
-        <h2 className="font-bold text-slate-900 mb-4">📁 Gegenereerde content ({content.length})</h2>
-        {content.length === 0 ? (
-          <div className="text-center py-16 text-gray-400 bg-white border border-gray-200 rounded-xl">
-            <p className="text-4xl mb-3">📄</p>
-            <p className="font-medium">Nog geen content gegenereerd</p>
-            <p className="text-sm mt-1">Gebruik de generator hierboven om te starten.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredContent.map((item) => (
-              <div key={item.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setExpanded(expanded === item.id ? null : item.id)}
-                  className="w-full flex items-center justify-between p-5 text-left hover:bg-gray-50 transition"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{item.niches?.icon || '📄'}</span>
-                    <div>
-                      <div className="font-semibold text-slate-900">
-                        {TYPE_LABELS[item.type] || item.type}
-                        {item.niches && <span className="text-slate-400 font-normal"> · {item.niches.naam}</span>}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {new Date(item.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${item.status === 'actief' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                      {item.status}
-                    </span>
-                    <span className="text-slate-400">{expanded === item.id ? '▲' : '▼'}</span>
-                  </div>
-                </button>
-                {expanded === item.id && (
-                  <div className="border-t border-gray-100 p-5">
-                    {renderContent(item)}
-                  </div>
-                )}
+      {loading ? (
+        <div className="text-center py-20 text-slate-400">Laden...</div>
+      ) : activeTab === 'trends' ? (
+        <>
+          {weekSamenvattingen.length === 0 ? (
+            <div className="bg-white border border-dashed border-slate-200 rounded-2xl py-20 text-center">
+              <div className="text-4xl mb-3">📡</div>
+              <p className="font-semibold text-slate-700 mb-1">Nog geen trend data</p>
+              <p className="text-sm text-slate-400 mb-6">Klik &apos;Scrape trends&apos; om Reddit, LinkedIn en Google Trends te scannen voor jouw niches.</p>
+              <button
+                onClick={scrapeTrends}
+                disabled={scrapingTrends}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-2.5 rounded-xl transition text-sm"
+              >
+                {scrapingTrends ? 'Bezig...' : 'Scrape nu'}
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Week selector */}
+              <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+                {weekSamenvattingen.map(w => (
+                  <button
+                    key={w.week}
+                    onClick={() => setActiveWeek(w.week)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap border transition ${activeWeek === w.week ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
+                  >
+                    {w.week} <span className="opacity-60 ml-1">({w.aantal})</span>
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+              {/* Aanbevolen hooks voor deze week */}
+              {activeWeekData?.hooks && activeWeekData.hooks.length > 0 && (
+                <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 mb-6 text-white">
+                  <div className="text-xs font-bold uppercase tracking-widest opacity-70 mb-3">Aanbevolen hooks deze week</div>
+                  <div className="space-y-3">
+                    {activeWeekData.hooks.map((hook, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <span className="text-orange-200 font-bold text-sm shrink-0">{i + 1}.</span>
+                        <p className="text-white font-medium leading-relaxed">&quot;{hook}&quot;</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-orange-400/30">
+                    {activeWeekData.bronnen.map(b => (
+                      <span key={b} className={`text-xs px-2 py-0.5 rounded-full border ${BRON_META[b]?.color || 'bg-white/20 text-white border-white/20'}`}>
+                        {BRON_META[b]?.icon} {BRON_META[b]?.label || b}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Inzichten grid */}
+              <div className="grid gap-4 md:grid-cols-2">
+                {weekInsights.map((insight) => {
+                  const bron = BRON_META[insight.bron] || { icon: '📰', label: insight.bron, color: 'bg-slate-50 text-slate-600 border-slate-200' }
+                  return (
+                    <div key={insight.id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-sm transition">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border ${bron.color}`}>
+                          {bron.icon} {bron.label}
+                        </span>
+                        {insight.niches && (
+                          <span className="text-xs text-slate-400">{insight.niches.icon} {insight.niches.naam}</span>
+                        )}
+                      </div>
+                      <h3 className="font-semibold text-slate-900 text-sm mb-2 leading-snug">{insight.titel}</h3>
+                      <p className="text-sm text-slate-600 leading-relaxed">{insight.samenvatting}</p>
+                      {insight.aanbevolen_hook && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <div className="text-xs font-semibold text-orange-600 mb-1">Hook voor content:</div>
+                          <p className="text-xs text-slate-600 italic">&quot;{insight.aanbevolen_hook}&quot;</p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        /* Content tab */
+        <>
+          {content.length === 0 ? (
+            <div className="bg-white border border-dashed border-slate-200 rounded-2xl py-20 text-center">
+              <div className="text-4xl mb-3">📄</div>
+              <p className="font-semibold text-slate-700 mb-1">Nog geen content gegenereerd</p>
+              <p className="text-sm text-slate-400">Start een pipeline run om automatisch content te genereren.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {content.map((item) => {
+                const meta = TYPE_META[item.type] || { icon: '📄', label: item.type }
+                const isOpen = expandedContent === item.id
+                return (
+                  <div key={item.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedContent(isOpen ? null : item.id)}
+                      className="w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{meta.icon}</span>
+                        <div>
+                          <div className="font-semibold text-slate-900 text-sm">
+                            {meta.label}
+                            {item.niches && <span className="text-slate-400 font-normal"> · {item.niches.icon} {item.niches.naam}</span>}
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            {new Date(item.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${item.status === 'actief' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                          {item.status}
+                        </span>
+                        <span className="text-slate-400 text-sm">{isOpen ? '▲' : '▼'}</span>
+                      </div>
+                    </button>
+                    {isOpen && (
+                      <div className="border-t border-slate-100 p-5 bg-slate-50/50">
+                        {renderContentPreview(item)}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
