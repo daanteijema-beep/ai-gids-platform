@@ -9,6 +9,8 @@ type ContentItem = {
   content: unknown
   status: string
   created_at: string
+  scheduled_date: string | null
+  platform: string | null
   niche_id: string
   niches?: { id: string; naam: string; icon: string }
 }
@@ -113,6 +115,7 @@ export default function ContentCalendarPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [activeWeek, setActiveWeek] = useState(0)
   const [filterType, setFilterType] = useState('all')
+  const [rescheduling, setRescheduling] = useState<string | null>(null)
 
   async function fetchContent() {
     setLoading(true)
@@ -134,12 +137,23 @@ export default function ContentCalendarPage() {
 
   useEffect(() => { void fetchContent() }, [])
 
-  // Groepeer per week
+  async function reschedule(id: string, scheduled_date: string) {
+    setRescheduling(id)
+    await fetch('/api/marketing/list', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, scheduled_date }),
+    })
+    setContent(prev => prev.map(c => c.id === id ? { ...c, scheduled_date } : c))
+    setRescheduling(null)
+  }
+
+  // Groepeer per week op scheduled_date (of created_at als fallback)
   const weekGroups: WeekGroup[] = []
   const weekMap = new Map<number, WeekGroup>()
 
   for (const item of content) {
-    const d = new Date(item.created_at)
+    const d = new Date(item.scheduled_date || item.created_at)
     const ws = getWeekStart(d)
     const key = ws.getTime()
     if (!weekMap.has(key)) {
@@ -302,15 +316,23 @@ export default function ContentCalendarPage() {
                         href={makeGoogleCalendarUrl(
                           `${meta.icon} ${meta.label}${item.niches ? ` — ${item.niches.naam}` : ''}`,
                           renderPostPreview(item),
-                          new Date(item.created_at)
+                          new Date(item.scheduled_date || item.created_at)
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={e => e.stopPropagation()}
                         className="text-xs text-slate-400 hover:text-blue-500 transition font-medium border border-slate-200 hover:border-blue-300 px-2 py-0.5 rounded-lg"
                       >
-                        📅 Google Calendar
+                        📅 Google Cal
                       </a>
+                      <input
+                        type="date"
+                        defaultValue={item.scheduled_date?.slice(0, 10) || item.created_at.slice(0, 10)}
+                        disabled={rescheduling === item.id}
+                        onClick={e => e.stopPropagation()}
+                        onChange={e => { if (e.target.value) void reschedule(item.id, e.target.value) }}
+                        className="text-xs border border-slate-200 rounded-lg px-2 py-0.5 text-slate-500 hover:border-orange-300 focus:outline-none focus:border-orange-400 disabled:opacity-50 cursor-pointer"
+                      />
                       <span className="text-xs text-orange-500 font-medium">
                         {isOpen ? '▲' : '▼'}
                       </span>
