@@ -179,10 +179,11 @@ Alleen JSON.`
     catch { await markeerFout('Claude gaf geen geldige JSON terug'); return new Response(JSON.stringify({ error: 'Ongeldige JSON' }), { status: 500 }) }
 
     // Foto's parallel — eerst brand_assets, dan Pexels live
+    const fallbackZoek = idee.doelgroep?.split(' ').slice(0, 3).join(' ') || 'business professional'
     const [linkedinFoto, metaFoto, instagramFoto] = await Promise.all([
-      zoekFoto(posts.linkedin.foto_zoekterm as string, 'linkedin'),
-      zoekFoto(posts.meta.foto_zoekterm as string, 'meta'),
-      zoekFoto(posts.instagram.foto_zoekterm as string, 'instagram'),
+      zoekFoto((posts.linkedin?.foto_zoekterm as string) || fallbackZoek, 'linkedin'),
+      zoekFoto((posts.meta?.foto_zoekterm as string) || fallbackZoek, 'meta'),
+      zoekFoto((posts.instagram?.foto_zoekterm as string) || fallbackZoek, 'instagram'),
     ])
 
     const linkedinBeeld = maakSociaalBeeld(linkedinFoto.url, posts.linkedin.headline as string, 'linkedin')
