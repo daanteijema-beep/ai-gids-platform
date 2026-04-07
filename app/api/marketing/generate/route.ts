@@ -1,16 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
+import { NextRequest, NextResponse } from 'next/server'
+import { isDashboardOrCronAuthorizedRequest } from '@/lib/request-auth'
+import { supabaseAdmin } from '@/lib/supabase'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+const TYPE_PLATFORM: Record<string, string> = {
+  cold_email_sequence: 'email',
+  linkedin_posts: 'linkedin',
+  instagram_posts: 'instagram',
+  landing_page_copy: 'website',
+  whatsapp_script: 'whatsapp',
+}
 
 function stripJson(text: string) {
   return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
 }
 
+function getDefaultScheduledDate(): string {
+  const date = new Date()
+  date.setDate(date.getDate() + 7)
+  date.setHours(0, 0, 0, 0)
+  return date.toISOString().slice(0, 10)
+}
+
 const PROMPTS: Record<string, (niche: string, zoekterm: string) => string> = {
   cold_email_sequence: (niche, zoekterm) => `
-Je bent een sales expert voor VakwebTwente — een dienst die professionele websites met slimme aanvraagflows bouwt voor ${niche} in Twente (€79–€149/maand).
+Je bent een sales expert voor VakwebTwente - een dienst die professionele websites met slimme aanvraagflows bouwt voor ${niche} in Twente (EUR79-EUR149/maand).
 
 Schrijf een cold email reeks van 3 emails voor het benaderen van ${niche} die (nog) geen goede website hebben.
 Elke email is max 5 zinnen, informeel maar professioneel, jij-vorm, specifiek voor ${zoekterm}s.
@@ -30,8 +46,7 @@ Elke post max 150 woorden, inclusief 3-5 hashtags.
 
 Geef terug als JSON array:
 [
-  { "type": "pijnpunt", "titel": "...", "tekst": "...", "hashtags": ["#...", "..."] },
-  ...
+  { "type": "pijnpunt", "titel": "...", "tekst": "...", "hashtags": ["#...", "..."] }
 ]
 Alleen JSON.`,
 
@@ -42,28 +57,27 @@ Thema's: voor/na website, meer aanvragen, minder gemiste oproepen, professioneel
 
 JSON array:
 [
-  { "thema": "...", "tekst": "...", "hashtags": ["..."] },
-  ...
+  { "thema": "...", "tekst": "...", "hashtags": ["..."] }
 ]
 Alleen JSON.`,
 
   landing_page_copy: (niche, zoekterm) => `
 Schrijf volledige landingspagina tekst voor VakwebTwente specifiek voor ${niche} in Twente.
-Product: website + slimme aanvraagflow voor ${zoekterm}s, €79–€149/maand.
+Product: website + slimme aanvraagflow voor ${zoekterm}s, EUR79-EUR149/maand.
 
 Geef terug als JSON:
 {
   "hero_headline": "...",
   "hero_subline": "...",
   "pijnpunten": ["...", "...", "..."],
-  "voordelen": [{ "titel": "...", "tekst": "..." }, ...],
+  "voordelen": [{ "titel": "...", "tekst": "..." }],
   "sociale_bewijzen": ["...", "..."],
-  "faq": [{ "vraag": "...", "antwoord": "..." }, ...],
+  "faq": [{ "vraag": "...", "antwoord": "..." }],
   "cta_tekst": "..."
 }
 Alleen JSON.`,
 
-  whatsapp_script: (niche, zoekterm) => `
+  whatsapp_script: (niche) => `
 Schrijf een WhatsApp-berichtscript voor VakwebTwente om ${niche} te benaderen.
 3 berichten: eerste contact, follow-up na 2 dagen, laatste kans na 5 dagen.
 Informeel, kort, max 2 zinnen per bericht. Eindig met een concrete uitnodiging.
@@ -78,13 +92,16 @@ Alleen JSON.`,
 }
 
 export async function POST(req: NextRequest) {
+  if (!isDashboardOrCronAuthorizedRequest(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { niche_id, type } = await req.json()
 
   if (!niche_id || !type) {
     return NextResponse.json({ error: 'niche_id en type zijn verplicht' }, { status: 400 })
   }
 
-  // Haal niche op
   const { data: niche } = await supabaseAdmin
     .from('niches')
     .select('*')
@@ -100,7 +117,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Onbekend type' }, { status: 400 })
   }
 
-  // Haal recentste trend insights op voor deze niche
   const { data: insights } = await supabaseAdmin
     .from('content_insights')
     .select('bron, titel, samenvatting, aanbevolen_hook')
@@ -109,9 +125,7 @@ export async function POST(req: NextRequest) {
     .limit(6)
 
   const trendContext = insights?.length
-    ? `\n\nACTUELE TREND DATA VOOR DEZE NICHE (gebruik deze inzichten):\n` +
-      insights.map(i => `[${i.bron}] ${i.titel}: ${i.samenvatting}`).join('\n') +
-      (insights[0]?.aanbevolen_hook ? `\n\nAanbevolen hook deze week: "${insights[0].aanbevolen_hook}"` : '')
+    ? `\n\nACTUELE TREND DATA VOOR DEZE NICHE (gebruik deze inzichten):\n${insights.map((i) => `[${i.bron}] ${i.titel}: ${i.samenvatting}`).join('\n')}${insights[0]?.aanbevolen_hook ? `\n\nAanbevolen hook deze week: "${insights[0].aanbevolen_hook}"` : ''}`
     : ''
 
   const prompt = promptFn(niche.naam, niche.sector_zoekterm) + trendContext
@@ -130,13 +144,17 @@ export async function POST(req: NextRequest) {
     content = { raw }
   }
 
-  const { error } = await supabaseAdmin.from('marketing_content').insert({
+  const payload = {
     niche_id,
     type,
-    titel: `${niche.naam} — ${type.replace('_', ' ')}`,
+    titel: `${niche.naam} - ${type.replace('_', ' ')}`,
     content,
+    platform: TYPE_PLATFORM[type] || null,
+    scheduled_date: getDefaultScheduledDate(),
     status: 'draft',
-  })
+  }
+
+  const { error } = await supabaseAdmin.from('marketing_content').insert(payload)
 
   if (error) {
     console.error(error)

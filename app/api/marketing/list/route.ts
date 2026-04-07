@@ -1,8 +1,13 @@
-import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+import { isDashboardOrCronAuthorizedRequest } from '@/lib/request-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!isDashboardOrCronAuthorizedRequest(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { data } = await supabaseAdmin
     .from('marketing_content')
     .select('*, niches(id, naam, icon)')
@@ -13,6 +18,10 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
+  if (!isDashboardOrCronAuthorizedRequest(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { id, scheduled_date } = await req.json()
   if (!id || !scheduled_date) return NextResponse.json({ error: 'id en scheduled_date vereist' }, { status: 400 })
 

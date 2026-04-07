@@ -135,7 +135,35 @@ export default function ContentCalendarPage() {
     void fetchContent()
   }
 
-  useEffect(() => { void fetchContent() }, [])
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadContent() {
+      setLoading(true)
+
+      try {
+        const res = await fetch('/api/marketing/list')
+        if (!res.ok || cancelled) {
+          return
+        }
+
+        const data = await res.json()
+        if (!cancelled) {
+          setContent(data.content || [])
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadContent()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function reschedule(id: string, scheduled_date: string) {
     setRescheduling(id)
