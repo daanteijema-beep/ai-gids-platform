@@ -6,6 +6,22 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+type CampaignLearning = {
+  product_type: string | null
+  doelgroep: string | null
+  beste_kanaal: string | null
+  wat_werkte: string | null
+  wat_niet_werkte: string | null
+  conversie_rate: number | null
+}
+
+type ProductIdeaSummary = {
+  naam: string
+  doelgroep: string
+  pijnpunt: string
+  geselecteerd: boolean
+}
+
 function isAuthorized(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret') || req.headers.get('x-cron-secret') || ''
   const auth = req.headers.get('authorization')?.replace('Bearer ', '') || ''
@@ -27,7 +43,7 @@ async function haalLearnings(): Promise<string> {
   if (!data?.length) return ''
 
   return `EERDERE CAMPAGNE INZICHTEN (gebruik dit om betere ideeën te genereren):
-${data.map(l =>
+${(data as CampaignLearning[]).map((l) =>
   `- ${l.product_type} voor ${l.doelgroep}: werkte=${l.wat_werkte}, niet=${l.wat_niet_werkte}, kanaal=${l.beste_kanaal}, conversie=${l.conversie_rate || '?'}%`
 ).join('\n')}
 
@@ -46,8 +62,9 @@ async function haalEerdereIdeeen(): Promise<string> {
 
   if (!data?.length) return ''
 
-  const gekozen = data.filter(i => i.geselecteerd).map(i => `  ✓ ${i.naam} (${i.doelgroep})`)
-  const afgewezen = data.filter(i => !i.geselecteerd).map(i => `  ✗ ${i.naam} (${i.doelgroep}): ${i.pijnpunt}`)
+  const ideeen = data as ProductIdeaSummary[]
+  const gekozen = ideeen.filter((i) => i.geselecteerd).map((i) => `  ✓ ${i.naam} (${i.doelgroep})`)
+  const afgewezen = ideeen.filter((i) => !i.geselecteerd).map((i) => `  ✗ ${i.naam} (${i.doelgroep}): ${i.pijnpunt}`)
 
   return `EERDER GEGENEREERDE IDEEËN — GEBRUIK DEZE NIET OPNIEUW:
 ${gekozen.length ? `Gekozen (al in productie):\n${gekozen.join('\n')}` : ''}

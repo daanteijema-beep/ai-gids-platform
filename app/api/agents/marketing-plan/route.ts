@@ -6,6 +6,13 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+type CampaignLearning = {
+  beste_kanaal: string | null
+  wat_werkte: string | null
+  email_open_rate: number | null
+  conversie_rate: number | null
+}
+
 function isAuthorized(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret') || req.headers.get('x-cron-secret') || ''
   const auth = req.headers.get('authorization')?.replace('Bearer ', '') || ''
@@ -71,7 +78,7 @@ async function haalMarketingLearnings(productType: string): Promise<string> {
     .limit(5)
 
   if (!data?.length) return ''
-  return `\nWAT EERDER WERKTE voor ${productType}:\n${data.map(l =>
+  return `\nWAT EERDER WERKTE voor ${productType}:\n${(data as CampaignLearning[]).map((l) =>
     `- Kanaal: ${l.beste_kanaal}, open rate: ${l.email_open_rate}%, conversie: ${l.conversie_rate}%: ${l.wat_werkte}`
   ).join('\n')}`
 }

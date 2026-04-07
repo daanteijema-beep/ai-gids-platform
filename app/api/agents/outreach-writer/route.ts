@@ -26,6 +26,11 @@ type Lead = {
   notitie: string | null
 }
 
+type OutreachLearning = {
+  wat_werkte: string | null
+  email_open_rate: number | null
+}
+
 // ─── Eerdere outreach learnings ophalen ───────────────────────────────────────
 async function haalOutreachLearnings(): Promise<string> {
   const { data } = await supabaseAdmin
@@ -35,7 +40,7 @@ async function haalOutreachLearnings(): Promise<string> {
     .limit(5)
 
   if (!data?.length) return ''
-  return `\nBEWEZEN WERKTE (hoge open rates):\n${data.map(l => `- ${l.wat_werkte} (${l.email_open_rate}% open rate)`).join('\n')}`
+  return `\nBEWEZEN WERKTE (hoge open rates):\n${(data as OutreachLearning[]).map((l) => `- ${l.wat_werkte} (${l.email_open_rate}% open rate)`).join('\n')}`
 }
 
 // ─── Email schrijven per lead ──────────────────────────────────────────────────

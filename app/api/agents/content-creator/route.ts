@@ -6,6 +6,17 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+type PipelineRunRecord = {
+  product_idea_id: string | null
+  product_ideas: Record<string, string>
+}
+
+type MarketingPlanRecord = {
+  icp: Record<string, string> | null
+  key_messages: string[] | null
+  social_plan: Record<string, Record<string, unknown>> | null
+}
+
 function isAuthorized(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret') || req.headers.get('x-cron-secret') || ''
   const auth = req.headers.get('authorization')?.replace('Bearer ', '') || ''
@@ -165,24 +176,26 @@ export async function POST(req: NextRequest) {
 
   const { run_id } = await req.json()
 
-  const { data: run } = await supabaseAdmin
+  const runResponse = await supabaseAdmin
     .from('pipeline_runs')
     .select('*, product_ideas!pipeline_runs_product_idea_id_fkey(*)')
     .eq('id', run_id)
     .single()
+  const run = runResponse.data as PipelineRunRecord | null
 
-  const { data: marketingPlan } = await supabaseAdmin
+  const marketingPlanResponse = await supabaseAdmin
     .from('marketing_plans')
     .select('*')
     .eq('run_id', run_id)
     .single()
+  const marketingPlan = marketingPlanResponse.data as MarketingPlanRecord | null
 
   if (!run?.product_idea_id || !marketingPlan) return NextResponse.json({ error: 'Missende data' }, { status: 400 })
 
-  const idee = run.product_ideas as Record<string, string>
-  const icp = (marketingPlan.icp as Record<string, string>) || {}
-  const keyMessages = (marketingPlan.key_messages as string[]) || []
-  const socialPlan = (marketingPlan.social_plan as Record<string, Record<string, unknown>>) || {}
+  const idee = run.product_ideas
+  const icp = marketingPlan.icp || {}
+  const keyMessages = marketingPlan.key_messages || []
+  const socialPlan = marketingPlan.social_plan || {}
 
   const posts = await schrijfPosts(idee, icp, keyMessages, socialPlan)
 
