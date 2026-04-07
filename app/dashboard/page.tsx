@@ -52,6 +52,17 @@ const TYPE_ICON: Record<string, string> = {
   landing_page_copy: '🌐', whatsapp_script: '💬', trend_analyse: '📊',
 }
 
+type InsightNiche = {
+  naam: string
+  icon: string
+}
+
+type ContentInsight = {
+  aanbevolen_hook: string
+  week: string
+  niches?: InsightNiche[] | null
+}
+
 function StatCard({ value, label, icon, href, accent, badge }: {
   value: number | string; label: string; icon: string; href: string; accent: string; badge?: string
 }) {
@@ -70,6 +81,7 @@ function StatCard({ value, label, icon, href, accent, badge }: {
 
 export default async function DashboardPage() {
   const { nieuweLeads, totalLeads, emailsKlaar, emailsVerstuurd, totalKlanten, pipelineRuns, activeRuns, recentLeads, recentEmails, recentContent, latestInsights } = await getStats()
+  const insights = (latestInsights ?? []) as ContentInsight[]
 
   const date = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
   const hour = new Date().getHours()
@@ -145,7 +157,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Trend hooks */}
-      {latestInsights && latestInsights.length > 0 && (
+      {insights.length > 0 && (
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -157,12 +169,12 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-3">
-            {(latestInsights as Array<{ aanbevolen_hook: string; week: string; niches?: { naam: string; icon: string } }>).map((insight, i) => (
+            {insights.map((insight, i) => (
               <div key={i} className="flex items-start gap-3">
                 <span className="text-orange-500 font-bold text-sm shrink-0 mt-0.5">{i + 1}.</span>
                 <div>
                   <p className="text-white text-sm leading-relaxed">&quot;{insight.aanbevolen_hook}&quot;</p>
-                  {insight.niches && <span className="text-xs text-slate-400">{insight.niches.icon} {insight.niches.naam}</span>}
+                  {insight.niches?.[0] && <span className="text-xs text-slate-400">{insight.niches[0].icon} {insight.niches[0].naam}</span>}
                 </div>
               </div>
             ))}

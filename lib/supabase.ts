@@ -5,12 +5,40 @@ import {
   getSupabaseUrl,
 } from '@/lib/env'
 
-const supabaseUrl = getSupabaseUrl()
-const supabaseClientKey = getSupabaseClientKey()
-const supabaseServiceKey = getSupabaseServiceRoleKey()
+type SupabaseClient = ReturnType<typeof createClient>
 
-export const supabase = createClient(supabaseUrl, supabaseClientKey)
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+let publicClient: SupabaseClient | null = null
+let adminClient: SupabaseClient | null = null
+
+function getPublicClient() {
+  if (!publicClient) {
+    publicClient = createClient(getSupabaseUrl(), getSupabaseClientKey())
+  }
+
+  return publicClient
+}
+
+function getAdminClient() {
+  if (!adminClient) {
+    adminClient = createClient(getSupabaseUrl(), getSupabaseServiceRoleKey())
+  }
+
+  return adminClient
+}
+
+function createLazyClient(getClient: () => SupabaseClient) {
+  return new Proxy({} as SupabaseClient, {
+    get(_target, prop, receiver) {
+      const client = getClient()
+      const value = Reflect.get(client, prop, receiver)
+
+      return typeof value === 'function' ? value.bind(client) : value
+    },
+  })
+}
+
+export const supabase = createLazyClient(getPublicClient)
+export const supabaseAdmin = createLazyClient(getAdminClient)
 
 // ============================================================
 // VAKWEBTWENTE TYPES
